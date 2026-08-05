@@ -60,8 +60,14 @@ jobs:
         run: npx wrangler deploy --config wrangler.generated.jsonc
 
       - name: Set moderation admin token (optional)
-        if: ${{ secrets.KINDCHAIN_ADMIN_TOKEN != '' }}
-        run: printf '%s' "${{ secrets.KINDCHAIN_ADMIN_TOKEN }}" | npx wrangler secret put KINDCHAIN_ADMIN_TOKEN --config wrangler.generated.jsonc
+        env:
+          KINDCHAIN_ADMIN_TOKEN: ${{ secrets.KINDCHAIN_ADMIN_TOKEN }}
+        run: |
+          if [ -n "$KINDCHAIN_ADMIN_TOKEN" ]; then
+            printf '%s' "$KINDCHAIN_ADMIN_TOKEN" | npx wrangler secret put KINDCHAIN_ADMIN_TOKEN --config wrangler.generated.jsonc
+          else
+            echo "KINDCHAIN_ADMIN_TOKEN not set - moderation API stays disabled (safe default)."
+          fi
 
       - name: Smoke-check the live deployment
         run: |
