@@ -1328,3 +1328,13 @@ button:focus-visible,a:focus-visible { outline:2px solid rgba(140,231,225,.86);o
 .map-toolbar .map-illuminate { width:auto;padding:0 14px;color:#0b0d1c;border:0;background:linear-gradient(120deg,#ffe9b8,#f4c66f);font-size:10px;font-weight:600;letter-spacing:.4px;white-space:nowrap;box-shadow:0 8px 26px rgba(244,198,111,.28); }
 .map-toolbar .map-illuminate:hover { background:linear-gradient(120deg,#fff0cb,#f7d28a); }
 .surface-badge.badge-community { color:#9fd8ff; }
+.map-ready.surface-community .map-depth-fallback{opacity:.05}
+.surface-community .map-host{filter:saturate(.96) contrast(1.04) brightness(1.0)}
+/* MapLibre's own stylesheet (loaded dynamically, after this file) tags the
+   host with .maplibregl-map { position:relative }, which beats our
+   single-class .map-host rule by load order and collapses the host to
+   height 0 — every tile then renders into a nonexistent strip. This was the
+   root cause of the "empty dark descent" in the v40 audit screenshot.
+   Two-class specificity keeps the host absolutely positioned regardless of
+   stylesheet order. */
+.neighborhood-map .map-host{position:absolute;inset:0;width:100%;height:100%}

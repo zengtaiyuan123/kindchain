@@ -3107,6 +3107,7 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
   useEffect(() => { surfaceStateRef.current = surfaceState; }, [surfaceState]);
   const mapCenterRef = useRef<{ lat: number; lon: number } | null>(null);
   const vectorUpgradeTimerRef = useRef<number | null>(null);
+  const hostResizeObserverRef = useRef<ResizeObserver | null>(null);
   const fallbackGeography = useMemo(() => {
     // The bundled atlas is an always-available geographic safety net. We cap
     // its visual zoom because it is a country atlas, while the raster map takes
@@ -3166,6 +3167,12 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
     }
   }, [zoomCommand]);
   useEffect(() => {
+    // Entering or leaving the interactive descent changes the effective
+    // layout; make sure the GL canvas re-measures either way.
+    const timer = window.setTimeout(() => { try { mapRef.current?.resize(); } catch { /* not ready */ } }, 900);
+    return () => window.clearTimeout(timer);
+  }, [interactive]);
+  useEffect(() => {
     const map = mapRef.current;
     if (interactive) return;
     const previewDepth = Math.max(0, Math.min(1, (globeZoom - MAP_MOUNT_DEPTH) / (MAP_HANDOFF_DEPTH - MAP_MOUNT_DEPTH)));
@@ -3205,6 +3212,16 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
           antialias: true,
         });
         mapRef.current = map;
+        // The descent container is born mid-transition (it can measure a
+        // fraction of its final size) and MapLibre only tracks WINDOW
+        // resizes. Without this observer the canvas keeps its birth size
+        // forever and the whole descent renders into a squashed strip —
+        // which reads as an empty dark map at every layer.
+        const hostResizeObserver = new ResizeObserver(() => {
+          try { map?.resize(); } catch { /* mid-teardown */ }
+        });
+        hostResizeObserver.observe(host);
+        hostResizeObserverRef.current = hostResizeObserver;
         map.dragRotate.disable();
         map.touchZoomRotate.disableRotation();
         const areaMarker = document.createElement("div");
@@ -3286,14 +3303,56 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
         // scale, revealing crisp roads, names and boundaries. Any failure
         // leaves the raster composite exactly as it was.
         let vectorErrors = 0;
-        vectorUpgradeTimerRef.current = window.setTimeout(() => {
+        // Community upgrade is a three-gate process. Gate 1: the style JSON
+        // itself. Gate 2: one REAL vector tile fetched end-to-end (a style
+        // whose tiles are unreachable must never replace a working map — a
+        // partially blocked network can otherwise leave the canvas empty
+        // while the UI still claims readiness). Gate 3: a post-adoption
+        // watchdog that reverts to the raster composite if the swapped style
+        // fails to reach a fully loaded, tile-rendered state in time.
+        const fetchWithTimeout = (url: string, ms: number) => {
           const controller = new AbortController();
-          const abortTimer = window.setTimeout(() => controller.abort(), 4500);
-          fetch("https://tiles.openfreemap.org/styles/liberty", { signal: controller.signal, mode: "cors" })
+          const timer = window.setTimeout(() => controller.abort(), ms);
+          return fetch(url, { signal: controller.signal, mode: "cors" }).finally(() => window.clearTimeout(timer));
+        };
+        const probeVectorTile = async (styleJson: import("maplibre-gl").StyleSpecification): Promise<boolean> => {
+          try {
+            const sources = styleJson.sources ?? {};
+            let template: string | null = null;
+            for (const source of Object.values(sources)) {
+              if ((source as { type?: string }).type !== "vector") continue;
+              const direct = (source as { tiles?: string[] }).tiles;
+              if (direct && direct[0]) { template = direct[0]; break; }
+              const tilejsonUrl = (source as { url?: string }).url;
+              if (tilejsonUrl) {
+                const response = await fetchWithTimeout(tilejsonUrl, 4000);
+                if (!response.ok) return false;
+                const tilejson = await response.json() as { tiles?: string[] };
+                if (tilejson.tiles && tilejson.tiles[0]) { template = tilejson.tiles[0]; break; }
+              }
+            }
+            if (!template) return false;
+            const center = mapCenterRef.current ?? initialViewRef.current;
+            const zoomLevel = 4;
+            const scale = 2 ** zoomLevel;
+            const tileX = Math.max(0, Math.min(scale - 1, Math.floor(((center.lon + 180) / 360) * scale)));
+            const latRad = (Math.max(-85, Math.min(85, center.lat)) * Math.PI) / 180;
+            const tileY = Math.max(0, Math.min(scale - 1, Math.floor(((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2) * scale)));
+            const tileUrl = template.replace("{z}", String(zoomLevel)).replace("{x}", String(tileX)).replace("{y}", String(tileY));
+            const tileResponse = await fetchWithTimeout(tileUrl, 4500);
+            return tileResponse.ok;
+          } catch {
+            return false;
+          }
+        };
+        vectorUpgradeTimerRef.current = window.setTimeout(() => {
+          fetchWithTimeout("https://tiles.openfreemap.org/styles/liberty", 4500)
             .then((response) => (response.ok ? response.json() : Promise.reject(new Error("style unavailable"))))
-            .then((styleJson: import("maplibre-gl").StyleSpecification) => {
-              window.clearTimeout(abortTimer);
+            .then(async (styleJson: import("maplibre-gl").StyleSpecification) => {
               if (cancelled || !map) return;
+              // Gate 2: prove real tile data flows before touching the map.
+              const tilesFlow = await probeVectorTile(styleJson);
+              if (!tilesFlow || cancelled || !map) return;
               const augmented: import("maplibre-gl").StyleSpecification = {
                 ...styleJson,
                 sources: {
@@ -3338,24 +3397,45 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
                   }
                 } catch { /* keep whatever rendered */ }
               });
-              const confirmVector = () => {
-                if (cancelled || !map) return;
+              // Gate 3: watchdog. The swap must reach "style loaded, tiles
+              // loaded, veil layer live" within 12s or we put the raster
+              // composite back exactly as it was. No half-alive canvas, ever.
+              const adoptionStartedAt = Date.now();
+              let vectorSettled = false;
+              const stopVectorWatch = () => {
+                if (watchdogInterval !== null) { window.clearInterval(watchdogInterval); watchdogInterval = null; }
+                if (map) {
+                  map.off("idle", confirmVector);
+                  map.off("styledata", confirmVector);
+                }
+              };
+              const revertVector = () => {
+                if (vectorSettled || cancelled || !map) return;
+                vectorSettled = true;
+                stopVectorWatch();
                 try {
-                  // Only claim the community surface once the adopted style is
-                  // actually live (its veil layer exists in the running map).
-                  if (map.isStyleLoaded() && map.getLayer("kindchain-satellite-veil")) {
+                  map.setStyle(LOCAL_MAP_STYLE);
+                  setSurfaceState(osmProbe === true ? "standard" : "loading");
+                } catch { /* keep whatever is on screen */ }
+              };
+              const confirmVector = () => {
+                if (vectorSettled || cancelled || !map) return;
+                try {
+                  if (map.isStyleLoaded() && map.areTilesLoaded() && map.getLayer("kindchain-satellite-veil")) {
+                    vectorSettled = true;
+                    stopVectorWatch();
                     setSurfaceState("community");
                     revealMap();
-                    map.off("idle", confirmVector);
-                    map.off("styledata", confirmVector);
+                    return;
                   }
-                } catch { /* try again on the next event */ }
+                } catch { /* try again on the next tick */ }
+                if (Date.now() - adoptionStartedAt > 12_000) revertVector();
               };
+              let watchdogInterval: number | null = window.setInterval(confirmVector, 1000);
               map.on("idle", confirmVector);
               map.on("styledata", confirmVector);
             })
-            .catch((error) => {
-              window.clearTimeout(abortTimer);
+            .catch(() => {
               /* raster composite stays — the enhancement is optional by design */
             });
         }, 1500);
@@ -3427,6 +3507,8 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
       cancelled = true;
       window.clearTimeout(readinessTimer);
       if (typeof vectorUpgradeTimerRef.current === "number") window.clearTimeout(vectorUpgradeTimerRef.current);
+      hostResizeObserverRef.current?.disconnect();
+      hostResizeObserverRef.current = null;
       mapRef.current = null;
       markerRef.current = null;
       descentLabelElementsRef.current = [];
