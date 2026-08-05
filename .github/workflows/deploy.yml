@@ -23,6 +23,11 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Restore script permissions
+        # Files uploaded through the GitHub web UI lose their executable bits;
+        # the build helpers exec each other directly and need them back.
+        run: chmod +x scripts/*.sh
+
       - name: Install dependencies
         run: npm ci --no-audit --no-fund
 
