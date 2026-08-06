@@ -728,6 +728,8 @@ const TRANSPORTS: Record<CourierMode, {
 
 const TRANSPORT_ORDER = Object.keys(TRANSPORTS) as CourierMode[];
 
+const COURIER_COACH_KEY = "kindchain-courier-coach-done";
+
 const COURIER_ASSETS: Partial<Record<CourierMode, string[]>> = {
   hand: ["https://static.poly.pizza/3746be88-6799-4817-929b-6bc067c47caa.glb"],
   pigeon: ["https://static.poly.pizza/dc872849-2253-41b7-b0bd-9138ad555ddc.glb"],
@@ -1610,6 +1612,17 @@ function keepFocusInside(event: KeyboardEvent, root: HTMLElement | null) {
 function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, textureUrl, baseTextureUrl, earthLens, earthDataLayer, observations, zoomStage, homePoint, activePoint, arrivalBloom, pickingPlace, selectedId, heldStoryIds, focus, zoomCommand, onSelect, onSelectJourney, onPick, onZoom, onNear, onInteract }: WorldProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [renderMode, setRenderMode] = useState<"loading" | "webgl" | "fallback">("loading");
+  const [courierCoachVisible, setCourierCoachVisible] = useState(false);
+  const coachRef = useRef<HTMLDivElement | null>(null);
+  const dismissCourierCoach = useCallback(() => {
+    try { window.localStorage.setItem(COURIER_COACH_KEY, "1"); } catch { /* private mode */ }
+    setCourierCoachVisible(false);
+  }, []);
+  useEffect(() => {
+    if (!courierCoachVisible) return;
+    const timer = window.setTimeout(() => setCourierCoachVisible(false), 16000);
+    return () => window.clearTimeout(timer);
+  }, [courierCoachVisible]);
   const apiRef = useRef<WorldApi | null>(null);
   const activityRef = useRef(activity);
   const localeRef = useRef(locale);
@@ -2504,11 +2517,46 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
         journeyLayer.add(trail);
         const model = createCourierModel(THREE, journey.mode, spec.color);
         model.scale.setScalar(journey.id === activeJourneyRef.current ? .42 : .31);
+        // Couriers render at ~12px on the world stage — far too small to tap.
+        // An invisible proxy sphere gives every courier a finger-sized hit
+        // area (raycast sees it; the renderer never draws it).
+        model.add(new THREE.Mesh(new THREE.SphereGeometry(.55, 8, 8), new THREE.MeshBasicMaterial({ visible: false })));
         journeyLayer.add(model);
         journeyVisuals.push({ journey, curve, model, trail, mailRelay: needsMailRelay(journey.mode, journey.distance) });
       });
     };
     updateJourneyVisuals(journeysRef.current);
+
+    // First-contact coach mark: once per device, when a courier model is
+    // actually on stage, point at it and say it can be tapped.
+    let courierCoachPoll: number | null = null;
+    const courierCoachDelay = window.setTimeout(() => {
+      try { if (window.localStorage.getItem(COURIER_COACH_KEY)) return; } catch { return; }
+      const tryShowCoach = () => {
+        if (cancelled) return;
+        if (journeyVisuals.some((visual) => visual.model.visible)) setCourierCoachVisible(true);
+        else courierCoachPoll = window.setTimeout(tryShowCoach, 2600);
+      };
+      tryShowCoach();
+    }, 9000);
+    let coachFrame = 0;
+    const coachWorldVector = new THREE.Vector3();
+    const coachProjectVector = new THREE.Vector3();
+    const positionCourierCoach = () => {
+      if (coachFrame++ % 5 !== 0) return;
+      const coachElement = coachRef.current;
+      if (!coachElement) return;
+      const anchor = journeyVisuals.find((visual) => visual.model.visible);
+      if (!anchor) { coachElement.style.opacity = "0"; return; }
+      anchor.model.getWorldPosition(coachWorldVector);
+      const nearSide = coachWorldVector.angleTo(camera.position) < Math.PI / 2 - .12;
+      coachProjectVector.copy(coachWorldVector).project(camera);
+      const onScreen = nearSide && coachProjectVector.z < 1 && Math.abs(coachProjectVector.x) < .92 && Math.abs(coachProjectVector.y) < .86;
+      if (!onScreen) { coachElement.style.opacity = "0"; return; }
+      coachElement.style.opacity = "1";
+      coachElement.style.left = `${(coachProjectVector.x * .5 + .5) * host.clientWidth}px`;
+      coachElement.style.top = `${(-coachProjectVector.y * .5 + .5) * host.clientHeight}px`;
+    };
 
     const courierAssetTimer = window.setTimeout(() => {
       if (cancelled || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -2554,6 +2602,7 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
             if (!journeyLayer.children.includes(model)) return;
             model.clear();
             model.add(assembly);
+            model.add(new THREE.Mesh(new THREE.SphereGeometry(.55, 8, 8), new THREE.MeshBasicMaterial({ visible: false })));
           }).catch(() => { /* Procedural courier remains as the offline fallback. */ });
         });
       }).catch(() => { /* Procedural couriers remain available if the model loader cannot be fetched. */ });
@@ -2663,6 +2712,38 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
     };
+    // Hover affordance: stars and couriers announce their tappability with a
+    // pointer cursor (and couriers with a glow-scale in the animate loop),
+    // instead of leaving discovery to luck.
+    let hoveredCourierId: string | null = null;
+    let lastHoverProbe = 0;
+    const hoverProbe = (event: PointerEvent) => {
+      const nowMs = performance.now();
+      if (nowMs - lastHoverProbe < 90) return;
+      lastHoverProbe = nowMs;
+      setPointer(event);
+      raycaster.setFromCamera(pointer, camera);
+      let cursor = "";
+      let nextHovered: string | null = null;
+      if (!pickingPlaceRef.current) {
+        if (raycaster.intersectObjects(markerMeshes, false).length > 0) cursor = "pointer";
+        else {
+          const visibleModels = journeyVisuals.filter((visual) => visual.model.visible).map((visual) => visual.model);
+          const hit = raycaster.intersectObjects(visibleModels, true)[0];
+          if (hit) {
+            let node: import("three").Object3D | null = hit.object;
+            while (node && !visibleModels.includes(node as import("three").Group)) node = node.parent;
+            const visual = journeyVisuals.find((item) => item.model === node);
+            if (visual) {
+              nextHovered = visual.journey.id;
+              cursor = "pointer";
+            }
+          }
+        }
+      }
+      hoveredCourierId = nextHovered;
+      renderer.domElement.style.cursor = cursor;
+    };
     const down = (event: PointerEvent) => {
       if (event.pointerType === "mouse" && event.button !== 0) return;
       activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -2684,6 +2765,7 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
       renderer.domElement.setPointerCapture(event.pointerId);
     };
     const move = (event: PointerEvent) => {
+      if (!pointerDown && event.pointerType === "mouse") hoverProbe(event);
       if (!activePointers.has(event.pointerId)) return;
       activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (activePointers.size >= 2) {
@@ -2748,6 +2830,8 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
           while (node && !visibleCourierModels.includes(node as import("three").Group)) node = node.parent;
           const visual = journeyVisuals.find((item) => item.model === node);
           if (visual) {
+            try { window.localStorage.setItem(COURIER_COACH_KEY, "1"); } catch { /* private mode */ }
+            setCourierCoachVisible(false);
             onSelectJourneyRef.current(visual.journey);
             return;
           }
@@ -2802,6 +2886,7 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
         }
       }
       if (solarFrame++ % 240 === 0) syncSolarLight();
+      positionCourierCoach();
       assetMixers.forEach((mixer) => mixer.update(dt));
       if (!pointerDown && !targetQuaternion && !focusLocked && performance.now() >= autoRotateResumeAt) world.rotation.y += dt * .0168;
       if (targetQuaternion) {
@@ -2890,10 +2975,11 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
           if (child.userData.wing) child.rotation.x = child.userData.wing * (1.05 + flutter * .52);
         });
         const active = journey.id === activeJourneyRef.current;
+        const hovered = journey.id === hoveredCourierId;
         const nearScale = THREE.MathUtils.mapLinear(camera.position.z, cameraNear, cameraFar, active ? .25 : .18, active ? .44 : .31);
-        model.scale.setScalar(nearScale * (1 + Math.sin(t * 2 + index) * .025));
+        model.scale.setScalar(nearScale * (hovered ? 1.38 : 1) * (1 + Math.sin(t * 2 + index) * .025));
         const trailMaterial = trail.material as import("three").LineDashedMaterial;
-        trailMaterial.opacity = presentation === "trace" ? (active ? .32 : .14) : active ? .86 : .34;
+        trailMaterial.opacity = presentation === "trace" ? (active ? .32 : .14) : hovered ? .95 : active ? .86 : .34;
         trailMaterial.dashOffset -= dt * (active ? .18 : .09);
       });
       try {
@@ -2918,6 +3004,8 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
       viewStateRef.current.initialized = true;
       cancelAnimationFrame(frame);
       window.clearTimeout(courierAssetTimer);
+      window.clearTimeout(courierCoachDelay);
+      if (courierCoachPoll !== null) window.clearTimeout(courierCoachPoll);
       window.removeEventListener("resize", resize);
       renderer.domElement.removeEventListener("pointerdown", down);
       renderer.domElement.removeEventListener("pointermove", move);
@@ -2964,6 +3052,11 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
   const fallbackBackgroundPosition = `${fallbackBackgroundX(focus.lon)}% center`;
 
   return <div className={`world-canvas lens-${earthLens} data-${earthDataLayer} ${renderMode === "webgl" ? "has-webgl" : renderMode === "fallback" ? "no-webgl" : ""} ${pickingPlace ? "is-picking-place" : ""}`} ref={mountRef} aria-label="Draggable 3D Earth with KindChain stars">
+    {courierCoachVisible && renderMode === "webgl" && <div className="courier-coach" ref={coachRef} role="status">
+      <span>{locale === "zh" ? "点点看这位信使 · 看它驮着什么" : "Tap this courier — see what it carries"}</span>
+      <button type="button" onClick={dismissCourierCoach} aria-label={locale === "zh" ? "知道了" : "Got it"}>×</button>
+      <b aria-hidden="true" />
+    </div>}
     <div className="world-fallback">
       <div className="fallback-orbit orbit-a" /><div className="fallback-orbit orbit-b" />
       <div className="fallback-globe" style={{ backgroundImage: `url(${baseTextureUrl})`, backgroundPosition: fallbackBackgroundPosition }}>
@@ -5686,7 +5779,7 @@ export default function Home() {
 
       {!journeyView && !watchingStory && onboardingStage === "done" && <CourierLegend stage={zoomStage} locale={locale} activeModes={journeys.filter((journey) => journeyProgress(journey) < 1 || journey.id.startsWith("journey-demo-world-")).map((journey) => journey.mode)} open={courierLegendOpen} onToggle={() => setCourierLegendOpen((value) => !value)} onPickMode={openCourierCargoByMode} />}
 
-      {stageHint && !journeyView && !watchingStory && <div key={stageHint.nonce} className="stage-hint" role="status"><i aria-hidden="true">◈</i><span>{stageHint.text}</span></div>}
+      {stageHint && !journeyView && !watchingStory && !notice && !isPickingPlace && !replyCeremony && !supportReceipt && <div key={stageHint.nonce} className="stage-hint" role="status"><i aria-hidden="true">◈</i><span>{stageHint.text}</span></div>}
 
       {cargoJourney && !journeyView && <JourneyCargoCard journey={cargoJourney} story={cargoStory} locale={locale} onFollow={() => { setCargoJourneyId(null); openJourney(cargoJourney, true); }} onRead={cargoStory ? () => { setCargoJourneyId(null); selectStory(cargoStory); } : null} onClose={() => setCargoJourneyId(null)} />}
 
