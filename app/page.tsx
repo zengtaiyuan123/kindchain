@@ -735,12 +735,12 @@ const COURIER_COACH_KEY = "kindchain-courier-coach-done";
 // served from /public/models. Only the future-era Kindship still borrows a
 // third-party model until its own design lands.
 const COURIER_ASSETS: Partial<Record<CourierMode, string[]>> = {
-  hand: ["/models/KC_WALKING_MAIL_CARRIER_LOD0.glb"],
-  pigeon: ["/models/KC_DOVE_LOD0.glb"],
-  carriage: ["/models/KC_POSTAL_STAGECOACH_LOD0.glb"],
-  rail: ["/models/KC_TRAIN_LOD0.glb"],
-  plane: ["/models/KC_AIRPLANE_LOD0.glb"],
-  rocket: ["/models/KC_ROCKET_LOD0.glb"],
+  hand: ["/KC_WALKING_MAIL_CARRIER_LOD0.glb"],
+  pigeon: ["/KC_DOVE_LOD0.glb"],
+  carriage: ["/KC_POSTAL_STAGECOACH_LOD0.glb"],
+  rail: ["/KC_TRAIN_LOD0.glb"],
+  plane: ["/KC_AIRPLANE_LOD0.glb"],
+  rocket: ["/KC_ROCKET_LOD0.glb"],
   starship: ["https://static.poly.pizza/0843ab59-1800-4d96-9cc7-b4d6afbecf21.glb"],
 };
 
