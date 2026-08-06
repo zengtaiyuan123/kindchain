@@ -730,13 +730,28 @@ const TRANSPORT_ORDER = Object.keys(TRANSPORTS) as CourierMode[];
 
 const COURIER_COACH_KEY = "kindchain-courier-coach-done";
 
+// v46: the KindChain courier fleet is self-hosted — our own Blender-built
+// models (purple/gold/pearl family, heart badges, named animation clips)
+// served from /public/models. Only the future-era Kindship still borrows a
+// third-party model until its own design lands.
 const COURIER_ASSETS: Partial<Record<CourierMode, string[]>> = {
-  hand: ["https://static.poly.pizza/3746be88-6799-4817-929b-6bc067c47caa.glb"],
-  pigeon: ["https://static.poly.pizza/dc872849-2253-41b7-b0bd-9138ad555ddc.glb"],
-  carriage: ["https://static.poly.pizza/d37dbc87-ca61-4b2c-a2da-d2f0c4240bef.glb", "https://static.poly.pizza/94b32c91-4d46-4172-aadd-10176a4eb543.glb"],
-  rail: ["https://static.poly.pizza/1f7946e4-dc66-42b2-b493-c3542bb5ba8a.glb"],
-  rocket: ["https://static.poly.pizza/244c027c-40f0-45ca-a707-0f8e855c9831.glb"],
+  hand: ["/models/KC_WALKING_MAIL_CARRIER_LOD0.glb"],
+  pigeon: ["/models/KC_DOVE_LOD0.glb"],
+  carriage: ["/models/KC_POSTAL_STAGECOACH_LOD0.glb"],
+  rail: ["/models/KC_TRAIN_LOD0.glb"],
+  plane: ["/models/KC_AIRPLANE_LOD0.glb"],
+  rocket: ["/models/KC_ROCKET_LOD0.glb"],
   starship: ["https://static.poly.pizza/0843ab59-1800-4d96-9cc7-b4d6afbecf21.glb"],
+};
+
+// Which named clips (from our GLBs) should loop while a courier travels.
+const COURIER_CLIPS: Partial<Record<CourierMode, string[]>> = {
+  hand: ["Walk_Loop"],
+  pigeon: ["Wing_Flap"],
+  carriage: ["Travel_Loop", "Lantern_Pulse"],
+  rail: ["Wheel_Loop", "Rod_Loop"],
+  plane: ["Idle_Flight", "Engine_Loop"],
+  rocket: ["Flame_Loop", "Idle_Hover"],
 };
 
 const INITIAL_STORIES: Story[] = [
@@ -2581,7 +2596,7 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
             assets.forEach((asset, index) => {
               const root = asset.scene;
               fitAsset(root);
-              if (journey.mode === "carriage") {
+              if (journey.mode === "carriage" && assets.length > 1) {
                 root.position.x = index === 0 ? .28 : -.3;
                 root.scale.multiplyScalar(index === 0 ? .8 : .7);
               }
@@ -2595,7 +2610,9 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
               assembly.add(root);
               if (asset.animations.length) {
                 const mixer = new THREE.AnimationMixer(root);
-                mixer.clipAction(asset.animations[0]).play();
+                const wanted = COURIER_CLIPS[journey.mode];
+                const clips = wanted ? asset.animations.filter((clip) => wanted.includes(clip.name)) : [];
+                (clips.length ? clips : [asset.animations[0]]).forEach((clip) => mixer.clipAction(clip).play());
                 assetMixers.push(mixer);
               }
             });
@@ -3878,7 +3895,7 @@ function CourierHero3D({ mode, variant = 0 }: { mode: CourierMode; variant?: num
           const center = box.getCenter(new THREE.Vector3());
           root.position.sub(center);
           root.scale.setScalar(1 / maxSize);
-          if (mode === "carriage") {
+          if (mode === "carriage" && assets.length > 1) {
             root.position.x = index === 0 ? .48 : -.36;
             root.scale.multiplyScalar(index === 0 ? .92 : .82);
           }
@@ -3901,10 +3918,15 @@ function CourierHero3D({ mode, variant = 0 }: { mode: CourierMode; variant?: num
           assembly.add(root);
           if (asset.animations.length) {
             const mixer = new THREE.AnimationMixer(root);
-            const preferred = asset.animations.find((clip) => /fly|flight|gallop|run|walk/i.test(clip.name)) ?? asset.animations[0];
-            const action = mixer.clipAction(preferred);
-            action.timeScale = mode === "pigeon" ? 1.15 : mode === "carriage" ? .9 : 1;
-            action.play();
+            const wanted = COURIER_CLIPS[mode];
+            const named = wanted ? asset.animations.filter((clip) => wanted.includes(clip.name)) : [];
+            const clips = named.length ? named
+              : [asset.animations.find((clip) => /fly|flight|gallop|run|walk/i.test(clip.name)) ?? asset.animations[0]];
+            clips.forEach((clip, clipIndex) => {
+              const action = mixer.clipAction(clip);
+              if (clipIndex === 0) action.timeScale = mode === "pigeon" ? 1.15 : mode === "carriage" ? .9 : 1;
+              action.play();
+            });
             mixers.push(mixer);
           }
         });
