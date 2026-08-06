@@ -1559,6 +1559,7 @@ type WorldProps = {
   focus: FocusPoint;
   zoomCommand: ZoomCommand;
   onSelect: (story: Story) => void;
+  onSelectJourney: (journey: Journey) => void;
   onPick: (lat: number, lon: number) => void;
   onZoom: (zoom: number) => void;
   onNear: () => void;
@@ -1606,7 +1607,7 @@ function keepFocusInside(event: KeyboardEvent, root: HTMLElement | null) {
   }
 }
 
-function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, textureUrl, baseTextureUrl, earthLens, earthDataLayer, observations, zoomStage, homePoint, activePoint, arrivalBloom, pickingPlace, selectedId, heldStoryIds, focus, zoomCommand, onSelect, onPick, onZoom, onNear, onInteract }: WorldProps) {
+function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, textureUrl, baseTextureUrl, earthLens, earthDataLayer, observations, zoomStage, homePoint, activePoint, arrivalBloom, pickingPlace, selectedId, heldStoryIds, focus, zoomCommand, onSelect, onSelectJourney, onPick, onZoom, onNear, onInteract }: WorldProps) {
   const mountRef = useRef<HTMLDivElement>(null);
   const [renderMode, setRenderMode] = useState<"loading" | "webgl" | "fallback">("loading");
   const apiRef = useRef<WorldApi | null>(null);
@@ -1624,6 +1625,7 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
   const selectedRef = useRef(selectedId);
   const heldRef = useRef(new Set(heldStoryIds));
   const onSelectRef = useRef(onSelect);
+  const onSelectJourneyRef = useRef(onSelectJourney);
   const onPickRef = useRef(onPick);
   const onZoomRef = useRef(onZoom);
   const onNearRef = useRef(onNear);
@@ -1671,6 +1673,7 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
   useEffect(() => { activeJourneyRef.current = activeJourneyId; }, [activeJourneyId]);
   useEffect(() => { heldRef.current = new Set(heldStoryIds); }, [heldStoryIds]);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+  useEffect(() => { onSelectJourneyRef.current = onSelectJourney; }, [onSelectJourney]);
   useEffect(() => { onPickRef.current = onPick; }, [onPick]);
   useEffect(() => { onZoomRef.current = onZoom; }, [onZoom]);
   useEffect(() => { onNearRef.current = onNear; }, [onNear]);
@@ -2736,6 +2739,19 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
           if (story) onSelectRef.current(story);
           return;
         }
+        // Couriers are tappable while their model presentation is on stage:
+        // opening the cargo card answers "what is this messenger carrying?".
+        const visibleCourierModels = journeyVisuals.filter((visual) => visual.model.visible).map((visual) => visual.model);
+        const hitCourier = raycaster.intersectObjects(visibleCourierModels, true)[0];
+        if (hitCourier) {
+          let node: import("three").Object3D | null = hitCourier.object;
+          while (node && !visibleCourierModels.includes(node as import("three").Group)) node = node.parent;
+          const visual = journeyVisuals.find((item) => item.model === node);
+          if (visual) {
+            onSelectJourneyRef.current(visual.journey);
+            return;
+          }
+        }
       }
       const hitEarth = raycaster.intersectObject(earth, false)[0];
       if (hitEarth) {
@@ -2996,7 +3012,7 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
           const endY = Math.max(7, Math.min(93, end.y));
           const presentation = courierPresentationAtZoom(journey.mode, zoomStage);
           const mailRelay = needsMailRelay(journey.mode, journey.distance);
-          return <span key={journey.id} className={`fallback-courier courier-${journey.mode} presentation-${presentation} ${journey.id.startsWith("journey-demo-world-") ? "demo-loop" : ""} ${mailRelay ? "mail-relay" : ""} ${journey.id === activeJourneyId ? "active" : ""}`} title={mailRelay ? (locale === "zh" ? "多段邮路：在海岸交给下一位信使" : "Multi-stage mail relay with a coastal handoff") : undefined} style={{ "--sx": `${startX}%`, "--sy": `${startY}%`, "--ex": `${endX}%`, "--ey": `${endY}%`, "--duration": `${Math.max(18, journey.demoDurationMs / 1000)}s` } as CSSProperties}><i>{TRANSPORTS[journey.mode].glyph}</i></span>;
+          return <button key={journey.id} type="button" className={`fallback-courier courier-${journey.mode} presentation-${presentation} ${journey.id.startsWith("journey-demo-world-") ? "demo-loop" : ""} ${mailRelay ? "mail-relay" : ""} ${journey.id === activeJourneyId ? "active" : ""}`} title={mailRelay ? (locale === "zh" ? "多段邮路：在海岸交给下一位信使" : "Multi-stage mail relay with a coastal handoff") : undefined} style={{ "--sx": `${startX}%`, "--sy": `${startY}%`, "--ex": `${endX}%`, "--ey": `${endY}%`, "--duration": `${Math.max(18, journey.demoDurationMs / 1000)}s` } as CSSProperties} onClick={(event) => { event.stopPropagation(); onSelectJourney(journey); }} aria-label={`${TRANSPORTS[journey.mode].names[locale]} · ${journey.from.label} → ${journey.to.label}`}><i>{TRANSPORTS[journey.mode].glyph}</i></button>;
         })}
       </div>
     </div>
@@ -3064,7 +3080,7 @@ function WeatherWall({ environment, weather, identity, profile, strength, point,
   );
 }
 
-function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interactive, blend, zoomCommand, stories, activity, journeys, activeJourneyId, onZoomChange, onExitZoom, onPick, onSelectStory, onIlluminate }: {
+function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interactive, blend, zoomCommand, stories, activity, journeys, activeJourneyId, onZoomChange, onExitZoom, onPick, onSelectStory, onSelectJourney, onIlluminate, onCenterChange }: {
   point: { lat: number; lon: number };
   label: string;
   hierarchy: PlaceHierarchy;
@@ -3081,7 +3097,9 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
   onExitZoom: () => void;
   onPick: (lat: number, lon: number) => void;
   onSelectStory: (story: Story) => void;
+  onSelectJourney: (journey: Journey) => void;
   onIlluminate: (center: { lat: number; lon: number }) => void;
+  onCenterChange: (center: { lat: number; lon: number }) => void;
 }) {
   const viewLat = Math.round(point.lat * 100) / 100;
   const viewLon = Math.round(point.lon * 100) / 100;
@@ -3138,6 +3156,8 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
   useEffect(() => { interactiveRef.current = interactive; }, [interactive]);
   const onIlluminateRef = useRef(onIlluminate);
   useEffect(() => { onIlluminateRef.current = onIlluminate; }, [onIlluminate]);
+  const onCenterChangeRef = useRef(onCenterChange);
+  useEffect(() => { onCenterChangeRef.current = onCenterChange; }, [onCenterChange]);
   useEffect(() => {
     descentLabelElementsRef.current.forEach(({ element, definition }) => {
       const text = element.querySelector("b");
@@ -3146,7 +3166,13 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
   }, [locale]);
   useEffect(() => {
     markerRef.current?.setLngLat([viewLon, viewLat]);
-    mapRef.current?.easeTo({ center: [viewLon, viewLat], duration: 650 });
+    const map = mapRef.current;
+    if (!map) return;
+    // Skip the recenter echo when the point update *came from* panning this
+    // map (destination sync); only genuinely new destinations move the camera.
+    const center = map.getCenter();
+    if (Math.abs(center.lat - viewLat) < .02 && Math.abs(center.lng - viewLon) < .02) return;
+    map.easeTo({ center: [viewLon, viewLat], duration: 650 });
   }, [viewLat, viewLon]);
   useEffect(() => {
     zoomCommandRef.current = zoomCommand;
@@ -3267,7 +3293,11 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
         map.on("zoom", updateZoom);
         map.on("moveend", () => {
           const center = map?.getCenter();
-          if (center) mapCenterRef.current = { lat: Math.round(center.lat * 100) / 100, lon: Math.round(center.lng * 100) / 100 };
+          if (!center) return;
+          mapCenterRef.current = { lat: Math.round(center.lat * 100) / 100, lon: Math.round(center.lng * 100) / 100 };
+          // While the user is actually inside the descent, let the app follow
+          // the explored destination (background identity, weather, hierarchy).
+          if (interactiveRef.current) onCenterChangeRef.current({ lat: center.lat, lon: center.lng });
         });
         map.on("click", (event) => pickRef.current(Math.round(event.lngLat.lat * 100) / 100, Math.round(event.lngLat.lng * 100) / 100));
         const revealMap = () => {
@@ -3594,7 +3624,7 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
         {localCouriers.map((journey, index) => {
           const progress = journeyProgress(journey);
           const presentation = courierPresentationAtZoom(journey.mode, localStage);
-          return <span key={journey.id} className={`mode-${journey.mode} presentation-${presentation} ${journey.id === activeJourneyId ? "active" : ""}`} style={{ left: `${18 + ((index * 23 + progress * 31) % 66)}%`, top: `${34 + (index % 3) * 17}%` }} title={`${TRANSPORTS[journey.mode].names[locale]} · ${locale === "zh" ? "模糊地域，不是实时个人轨迹" : "Coarse area, not a live personal trail"}`}><i>{TRANSPORTS[journey.mode].glyph}</i></span>;
+          return <button key={journey.id} type="button" className={`mode-${journey.mode} presentation-${presentation} ${journey.id === activeJourneyId ? "active" : ""}`} style={{ left: `${18 + ((index * 23 + progress * 31) % 66)}%`, top: `${34 + (index % 3) * 17}%` }} title={`${TRANSPORTS[journey.mode].names[locale]} · ${locale === "zh" ? "模糊地域，不是实时个人轨迹" : "Coarse area, not a live personal trail"}`} onClick={(event) => { event.stopPropagation(); onSelectJourney(journey); }} aria-label={`${TRANSPORTS[journey.mode].names[locale]} · ${journey.from.label} → ${journey.to.label}`}><i>{TRANSPORTS[journey.mode].glyph}</i><b className="courier-progress-ring" style={{ "--ring": `${Math.round(progress * 100)}%` } as CSSProperties} aria-hidden="true" /></button>;
         })}
       </div>}
       <header className="map-lens">
@@ -3902,6 +3932,147 @@ function JourneyStage({ journey, locale, earthHidden, onToggleEarth, onExit }: {
   );
 }
 
+const ZOOM_STAGE_ORDER: ZoomStage[] = ["ORBIT", "EARTH", "CONTINENT", "COUNTRY", "REGION", "CITY", "DISTRICT", "COMMUNITY"];
+const ZOOM_STAGE_NAMES: Record<ZoomStage, { zh: string; en: string }> = {
+  ORBIT: { zh: "轨道", en: "Orbit" },
+  EARTH: { zh: "整个地球", en: "Whole Earth" },
+  CONTINENT: { zh: "大洲", en: "Continent" },
+  COUNTRY: { zh: "国家", en: "Country" },
+  REGION: { zh: "省/州", en: "Province" },
+  CITY: { zh: "城市", en: "City" },
+  DISTRICT: { zh: "区县", en: "District" },
+  COMMUNITY: { zh: "社区", en: "Community" },
+};
+
+// Where a courier lives on the zoom ladder, and how to reach it from here.
+// This surfaces the courierPresentationAtZoom matrix to people instead of
+// leaving it as an invisible rule they bump into.
+function courierAppearanceGuide(mode: CourierMode, stage: ZoomStage, locale: Locale): { state: "model" | "trace" | "zoom-in" | "zoom-out"; text: string } {
+  const zh = locale === "zh";
+  const now = courierPresentationAtZoom(mode, stage);
+  if (now === "model") return { state: "model", text: zh ? "此刻在场 · 点它看驮了什么" : "On stage now — tap for its cargo" };
+  if (now === "trace") return { state: "trace", text: zh ? "此刻化作一道光迹" : "Now only a light trail" };
+  const index = ZOOM_STAGE_ORDER.indexOf(stage);
+  let zoomIn: ZoomStage | null = null;
+  for (let i = index + 1; i < ZOOM_STAGE_ORDER.length; i += 1) {
+    if (courierPresentationAtZoom(mode, ZOOM_STAGE_ORDER[i]) !== "hidden") { zoomIn = ZOOM_STAGE_ORDER[i]; break; }
+  }
+  let zoomOut: ZoomStage | null = null;
+  for (let i = index - 1; i >= 0; i -= 1) {
+    if (courierPresentationAtZoom(mode, ZOOM_STAGE_ORDER[i]) !== "hidden") { zoomOut = ZOOM_STAGE_ORDER[i]; break; }
+  }
+  if (zoomIn && (!zoomOut || ZOOM_STAGE_ORDER.indexOf(zoomIn) - index <= index - ZOOM_STAGE_ORDER.indexOf(zoomOut))) {
+    return { state: "zoom-in", text: zh ? `放大到「${ZOOM_STAGE_NAMES[zoomIn].zh}」出现` : `Zoom in to ${ZOOM_STAGE_NAMES[zoomIn].en}` };
+  }
+  if (zoomOut) return { state: "zoom-out", text: zh ? `缩小到「${ZOOM_STAGE_NAMES[zoomOut].zh}」出现` : `Zoom out to ${ZOOM_STAGE_NAMES[zoomOut].en}` };
+  return { state: "zoom-in", text: zh ? "在别的空间层出现" : "Lives at another layer" };
+}
+
+function courierStageRangeLabel(mode: CourierMode, locale: Locale) {
+  const stages = ZOOM_STAGE_ORDER.filter((stage) => courierPresentationAtZoom(mode, stage) !== "hidden");
+  if (!stages.length) return "";
+  const zh = locale === "zh";
+  const first = ZOOM_STAGE_NAMES[stages[0]][zh ? "zh" : "en"];
+  const last = ZOOM_STAGE_NAMES[stages[stages.length - 1]][zh ? "zh" : "en"];
+  return first === last ? first : `${first} – ${last}`;
+}
+
+function JourneyCargoCard({ journey, story, locale, onFollow, onRead, onClose }: {
+  journey: Journey; story: Story | null; locale: Locale; onFollow: () => void; onRead: (() => void) | null; onClose: () => void;
+}) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setTick((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const zh = locale === "zh";
+  const spec = TRANSPORTS[journey.mode];
+  const progress = journeyProgress(journey);
+  const demo = journey.id.startsWith("journey-demo-");
+  const arrived = !demo && progress >= 1;
+  const mailRelay = needsMailRelay(journey.mode, journey.distance);
+  const remaining = formatDuration(Math.max(.02, journey.etaHours * (1 - progress)), locale);
+  // Fact-labels stay honest: a looping showcase route is never presented as a
+  // live personal delivery, and network cargo is labeled as the pilot network.
+  const factLabel = demo
+    ? (zh ? "演示邮路 · 循环航行" : "DEMO ROUTE · LOOPING")
+    : story?.networkState === "shared" ? (zh ? "真实网络 · 试运行" : "REAL NETWORK · PILOT") : (zh ? "本机旅程" : "ON THIS DEVICE");
+  const cargoText = story ? storyText(story, locale, false) : (zh ? "一束匿名的光" : "An anonymous light");
+  const replyCount = story?.replies.length ?? 0;
+  return (
+    <aside className={`journey-cargo-card mode-${journey.mode} ${arrived ? "cargo-arrived" : ""}`} role="dialog" aria-label={zh ? `${spec.names[locale]} 的驮货` : `Cargo of ${spec.names[locale]}`}>
+      <header>
+        <i className="cargo-glyph" aria-hidden="true">{spec.glyph}</i>
+        <div>
+          <small>{factLabel}</small>
+          <strong>{spec.names[locale]}</strong>
+          <em>{spec.era[locale]}</em>
+        </div>
+        <button type="button" className="cargo-close" onClick={onClose} aria-label={zh ? "关闭" : "Close"}>×</button>
+      </header>
+      <div className="cargo-hold">
+        <small>{zh ? "它驮着" : "IT CARRIES"}</small>
+        <blockquote>“{cargoText}”</blockquote>
+        <em>{story ? `${story.region} · ${replyCount} ${zh ? "个回应同行" : replyCount === 1 ? "reply riding along" : "replies riding along"}` : (zh ? "匿名 · 模糊地域" : "Anonymous · coarse area")}{journey.scenario ? ` · ${journeyScenarioLabel(journey.scenario, locale)}` : ""}</em>
+      </div>
+      <div className="cargo-route">
+        <span><i /><b>{journey.from.label}</b></span>
+        <u><b style={{ width: `${Math.min(100, progress * 100)}%` }}><i className="cargo-dot" style={{ left: "100%" }}>{spec.glyph}</i></b></u>
+        <span><b>{journey.to.label}</b><i /></span>
+      </div>
+      <div className="cargo-numbers">
+        <span><small>{zh ? "路程" : "DISTANCE"}</small><b>{Math.round(journey.distance).toLocaleString()} km</b></span>
+        <span><small>{zh ? "进度" : "PROGRESS"}</small><b>{Math.round(Math.min(100, progress * 100))}%</b></span>
+        <span><small>{arrived ? (zh ? "状态" : "STATUS") : (zh ? "剩余" : "REMAINING")}</small><b>{arrived ? (zh ? "已抵达" : "Arrived") : remaining}</b></span>
+      </div>
+      {mailRelay && <p className="cargo-note">{zh ? "多段邮路：跨海时交给下一位信使接力。" : "Multi-stage mail relay: handed to the next courier at the coast."}</p>}
+      <footer>
+        <button type="button" className="cargo-follow" onClick={onFollow}><span>◉</span>{zh ? "跟随它旅行" : "Travel with it"}</button>
+        {onRead && <button type="button" className="cargo-read" onClick={onRead}>{zh ? "读它驮的光" : "Read its light"} →</button>}
+      </footer>
+      <small className="cargo-privacy">{zh ? "模糊邮路示意 · 不是实时个人轨迹" : "Coarse route sketch · not a live personal trail"}</small>
+    </aside>
+  );
+}
+
+function CourierLegend({ stage, locale, activeModes, open, onToggle, onPickMode }: {
+  stage: ZoomStage; locale: Locale; activeModes: CourierMode[]; open: boolean; onToggle: () => void; onPickMode: (mode: CourierMode) => void;
+}) {
+  const zh = locale === "zh";
+  const visibleCount = TRANSPORT_ORDER.filter((mode) => courierPresentationAtZoom(mode, stage) !== "hidden").length;
+  return (
+    <div className={`courier-legend ${open ? "legend-open" : ""}`}>
+      <button type="button" className="courier-legend-toggle" onClick={onToggle} aria-expanded={open} aria-label={zh ? "信使图例" : "Courier legend"}>
+        <i aria-hidden="true">✈</i>
+        <span>{zh ? "信使图例" : "COURIERS"}</span>
+        <b>{visibleCount}/{TRANSPORT_ORDER.length}</b>
+      </button>
+      {open && <div className="courier-legend-panel" role="list" aria-label={zh ? "每种信使出现的空间层" : "Where each courier appears"}>
+        <header>
+          <small>{zh ? "当前镜头" : "CURRENT LAYER"}</small>
+          <strong>{ZOOM_STAGE_NAMES[stage][zh ? "zh" : "en"]}</strong>
+          <em>{zh ? "每种信使只在属于它的空间层出现" : "Each courier appears only where it belongs"}</em>
+        </header>
+        {TRANSPORT_ORDER.map((mode) => {
+          const guide = courierAppearanceGuide(mode, stage, locale);
+          const journeyHere = activeModes.includes(mode);
+          const tappable = guide.state === "model" && journeyHere;
+          return (
+            <button type="button" role="listitem" key={mode} className={`legend-row state-${guide.state} ${journeyHere ? "has-journey" : "no-journey"}`} disabled={!tappable} onClick={() => tappable && onPickMode(mode)}>
+              <i className={`legend-glyph mode-${mode}`} aria-hidden="true">{TRANSPORTS[mode].glyph}</i>
+              <span>
+                <strong>{TRANSPORTS[mode].names[locale]}</strong>
+                <small>{courierStageRangeLabel(mode, locale)}</small>
+              </span>
+              <em>{tappable ? guide.text : guide.state === "model" ? (zh ? "此层可见 · 暂无在途邮路" : "This layer — no route in flight") : guide.text}</em>
+            </button>
+          );
+        })}
+      </div>}
+    </div>
+  );
+}
+
 function useSoundscape(on: boolean, environment: Environment) {
   const contextRef = useRef<AudioContext | null>(null);
   const masterRef = useRef<GainNode | null>(null);
@@ -4076,6 +4247,9 @@ export default function Home() {
   const [placePickerOpen, setPlacePickerOpen] = useState(false);
   const [journeys, setJourneys] = useState<Journey[]>(() => createExperienceJourneys());
   const [activeJourneyId, setActiveJourneyId] = useState<string | null>("journey-demo-world-rocket");
+  const [cargoJourneyId, setCargoJourneyId] = useState<string | null>(null);
+  const [courierLegendOpen, setCourierLegendOpen] = useState(false);
+  const [stageHint, setStageHint] = useState<{ text: string; nonce: number } | null>(null);
   const [journeyView, setJourneyView] = useState(false);
   const [earthHidden, setEarthHidden] = useState(false);
   const [now, setNow] = useState(0);
@@ -4162,6 +4336,8 @@ export default function Home() {
       : (locale === "zh" ? "撤回失败，请稍后再试。" : "Could not withdraw right now."));
   }, [governanceNotice, locale, selected]);
   const activeJourney = journeys.find((journey) => journey.id === activeJourneyId) ?? journeys[0] ?? null;
+  const cargoJourney = cargoJourneyId ? journeys.find((journey) => journey.id === cargoJourneyId) ?? null : null;
+  const cargoStory = cargoJourney ? stories.find((story) => story.id === cargoJourney.storyId) ?? null : null;
   const solarMinute = Math.floor(now / 60000);
   const auroraChance = useMemo(() => auroraGrid
     .filter(([lon, lat]) => Math.abs(lat - location.lat) <= 4 && Math.abs(lon - location.lon) <= 7)
@@ -4952,6 +5128,51 @@ export default function Home() {
     setFocus((current) => ({ lat: journey.to.lat, lon: journey.to.lon, nonce: current.nonce + 1 }));
   };
 
+  // v44 ①: tapping a courier — on the globe, the fallback sky or the community
+  // map — opens its cargo card instead of leaving people guessing what it is.
+  const openCourierCargo = useCallback((journey: Journey) => {
+    setActiveJourneyId(journey.id);
+    setCargoJourneyId(journey.id);
+    setCourierLegendOpen(false);
+  }, []);
+
+  const openCourierCargoByMode = useCallback((mode: CourierMode) => {
+    setJourneys((current) => {
+      const journey = current.find((item) => item.mode === mode && journeyProgress(item) < 1)
+        ?? current.find((item) => item.mode === mode);
+      if (journey) {
+        setActiveJourneyId(journey.id);
+        setCargoJourneyId(journey.id);
+      }
+      return current;
+    });
+    setCourierLegendOpen(false);
+  }, []);
+
+  // v44 ③: while descending, the whole scene follows the destination being
+  // explored — weather, place identity and hierarchy re-anchor to the map
+  // center once the camera settles, not to where the descent began.
+  const locationRef = useRef(location);
+  useEffect(() => { locationRef.current = location; }, [location]);
+  const descentSyncTimerRef = useRef<number | null>(null);
+  useEffect(() => () => { if (descentSyncTimerRef.current) window.clearTimeout(descentSyncTimerRef.current); }, []);
+  const syncSceneToMapCenter = useCallback((center: { lat: number; lon: number }) => {
+    if (descentSyncTimerRef.current) window.clearTimeout(descentSyncTimerRef.current);
+    descentSyncTimerRef.current = window.setTimeout(() => {
+      const current = locationRef.current;
+      if (distanceKm(center, current) < 45) return;
+      const geography = geographicContextFor(center);
+      const label = locale === "zh" ? geography.country.zh : geography.country.en;
+      const previousProfile = placeProfileFor(current.lat, current.lon, current.label);
+      const nextProfile = placeProfileFor(center.lat, center.lon, label);
+      void fetchWeather(center.lat, center.lon, label);
+      if (nextProfile.id !== previousProfile.id) {
+        setNotice(locale === "zh" ? `背景已同步：${nextProfile.title.zh}` : `Scene synced: ${nextProfile.title.en}`);
+        window.setTimeout(() => setNotice(null), 2600);
+      }
+    }, 1150);
+  }, [fetchWeather, locale]);
+
   const networkFailureMessage = (error: string) => {
     if (error === "private_contact_blocked") return locale === "zh" ? "为了安全，这封信没有公开：请删去电话、邮箱、网址或社交账号。它仍留在你的设备上。" : "For safety, this was not made public. Remove phone numbers, email, links or social handles. It remains on this device.";
     if (error === "unsafe_public_content") return locale === "zh" ? "这段内容不适合进入公开地球，已只保存在你的设备上。若你正处在危险中，请使用求助入口。" : "This text was kept off the public Earth and remains on your device. If you are in danger, use the support entrance.";
@@ -5382,6 +5603,27 @@ export default function Home() {
     if (pickedPlace && placeMomentNonce > 0) return { lat: pickedPlace.lat, lon: pickedPlace.lon, nonce: placeMomentNonce };
     return null;
   }, [pickedPlace, placeMomentNonce, replyCeremony, selected]);
+  // v44 ②: announce couriers the moment a zoom layer brings them on stage, so
+  // "when do I see the pigeon / the plane?" is answered by the scene itself.
+  const visibleCourierSignature = TRANSPORT_ORDER.filter((mode) => courierPresentationAtZoom(mode, zoomStage) !== "hidden").join("|");
+  const previousCourierSignatureRef = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousCourierSignatureRef.current;
+    previousCourierSignatureRef.current = visibleCourierSignature;
+    if (previous === null || previous === visibleCourierSignature) return;
+    const before = new Set(previous.split("|").filter(Boolean));
+    const arrivedModes = visibleCourierSignature.split("|").filter(Boolean).filter((mode) => !before.has(mode)) as CourierMode[];
+    if (!arrivedModes.length) return;
+    const names = arrivedModes.map((mode) => TRANSPORTS[mode].names[locale]).join(" · ");
+    const stageName = ZOOM_STAGE_NAMES[zoomStage][locale === "zh" ? "zh" : "en"];
+    const timer = window.setTimeout(() => setStageHint({ text: locale === "zh" ? `进入「${stageName}」镜头 · ${names} 出现了` : `${stageName} layer · ${names} appeared`, nonce: (Date.now() % 1e9) }), 30);
+    return () => window.clearTimeout(timer);
+  }, [locale, visibleCourierSignature, zoomStage]);
+  useEffect(() => {
+    if (!stageHint) return;
+    const timer = window.setTimeout(() => setStageHint(null), 4600);
+    return () => window.clearTimeout(timer);
+  }, [stageHint]);
   const wallStrengthByStage: Record<ZoomStage, number> = { ORBIT: .08, EARTH: pickedPlace ? .38 : .22, CONTINENT: .55, COUNTRY: .82, REGION: .96, CITY: .94, DISTRICT: .9, COMMUNITY: .86 };
   const wallBaseStrength = wallStrengthByStage[zoomStage];
   const placeWallStrength = isEncountering ? Math.max(.56, wallBaseStrength) : isPickingPlace ? Math.max(.42, wallBaseStrength) : wallBaseStrength;
@@ -5405,18 +5647,18 @@ export default function Home() {
   } : null;
 
   return (
-    <main className={`world-app time-${environment.time} weather-${environment.weather} biome-${environment.biome} hazard-${environment.hazard} zone-${currentZone} place-${placeProfile.id} season-${backgroundIdentity.season} latitude-${backgroundIdentity.latitude} air-${backgroundIdentity.air} wind-${backgroundIdentity.wind} settlement-${backgroundIdentity.settlement} material-${backgroundIdentity.material} zoom-${zoomStage.toLowerCase()} ${environment.aurora ? "aurora-active" : ""} ${zoom > .65 ? "is-near" : ""} ${nearView ? "near-map-open" : ""} ${panel === "menu" ? "is-world-open" : ""} ${panel === "light-choice" || panel === "support" || supportReceipt ? "is-support-open" : ""} ${journeyView ? `journey-view journey-${activeJourney?.mode ?? "pigeon"}` : ""} ${earthHidden ? "earth-hidden" : ""} ${isEncountering ? "is-encountering" : ""} ${isPickingPlace ? "is-picking-place" : ""} ${watchingStory ? "is-watching" : ""} ${isMemorySky ? "is-memory-sky" : ""}`} style={{ "--earth-zoom": String(zoom), "--earth-opacity": String(earthOpacity), "--scene-reveal": String(sceneReveal), "--courier-scale": String(courierScale), "--solar-x": `${solarX}%`, "--map-blend": String(mapBlend), "--place-foreground": String(placeForegroundStrength), "--place-zenith": placeProfile.palette.zenith, "--place-horizon": placeProfile.palette.horizon, "--place-far": placeProfile.palette.far, "--place-near": placeProfile.palette.near, "--place-water": placeProfile.palette.water, "--place-glow": placeProfile.palette.glow } as CSSProperties}>
+    <main className={`world-app time-${environment.time} weather-${environment.weather} biome-${environment.biome} hazard-${environment.hazard} zone-${currentZone} place-${placeProfile.id} season-${backgroundIdentity.season} latitude-${backgroundIdentity.latitude} air-${backgroundIdentity.air} wind-${backgroundIdentity.wind} settlement-${backgroundIdentity.settlement} material-${backgroundIdentity.material} zoom-${zoomStage.toLowerCase()} ${environment.aurora ? "aurora-active" : ""} ${zoom > .65 ? "is-near" : ""} ${nearView ? "near-map-open" : ""} ${panel === "menu" ? "is-world-open" : ""} ${panel === "light-choice" || panel === "support" || supportReceipt ? "is-support-open" : ""} ${journeyView ? `journey-view journey-${activeJourney?.mode ?? "pigeon"}` : ""} ${earthHidden ? "earth-hidden" : ""} ${isEncountering ? "is-encountering" : ""} ${isPickingPlace ? "is-picking-place" : ""} ${watchingStory ? "is-watching" : ""} ${isMemorySky ? "is-memory-sky" : ""} ${cargoJourney && !journeyView ? "is-cargo-open" : ""}`} style={{ "--earth-zoom": String(zoom), "--earth-opacity": String(earthOpacity), "--scene-reveal": String(sceneReveal), "--courier-scale": String(courierScale), "--solar-x": `${solarX}%`, "--map-blend": String(mapBlend), "--place-foreground": String(placeForegroundStrength), "--place-zenith": placeProfile.palette.zenith, "--place-horizon": placeProfile.palette.horizon, "--place-far": placeProfile.palette.far, "--place-near": placeProfile.palette.near, "--place-water": placeProfile.palette.water, "--place-glow": placeProfile.palette.glow } as CSSProperties}>
       <WeatherWall key={`${placeProfile.id}-${Math.round(location.lat * 2)}-${Math.round(location.lon * 2)}-${sceneNonce}`} environment={environment} weather={weather} identity={backgroundIdentity} profile={placeProfile} strength={placeWallStrength} point={location} sceneSeed={sceneNonce} />
       <div className="emotional-atmosphere" aria-hidden="true"><i /><i /><i /><b /></div>
       <div className="memory-sky" aria-hidden="true"><i /><i /><i /><i /><i /><i /><b /><em /></div>
       <div className="living-current-ambience" aria-hidden="true"><i /><i /><i /></div>
       {journeyView && activeJourney && <JourneyStage journey={activeJourney} locale={locale} earthHidden={earthHidden} onToggleEarth={() => setEarthHidden((value) => !value)} onExit={() => { setJourneyView(false); setEarthHidden(false); setPanel("journeys"); }} />}
-      <LivingWorld locale={locale} stories={stories} activity={dailyActivity} journeys={journeys} activeJourneyId={activeJourneyId} textureUrl={textureUrl} baseTextureUrl={baseTextureUrl} earthLens={earthLens} earthDataLayer={earthDataLayer} observations={earthObservations} zoomStage={zoomStage} homePoint={userLocation} activePoint={pickedPlace} arrivalBloom={arrivalBloom} pickingPlace={isPickingPlace} selectedId={selectedId} heldStoryIds={heldStoryIds} focus={focus} zoomCommand={zoomCommand} onSelect={selectStory} onPick={pickEarth} onZoom={handleEarthZoom} onNear={enterNeighborhood} onInteract={acknowledgeSpatialGuide} />
+      <LivingWorld locale={locale} stories={stories} activity={dailyActivity} journeys={journeys} activeJourneyId={activeJourneyId} textureUrl={textureUrl} baseTextureUrl={baseTextureUrl} earthLens={earthLens} earthDataLayer={earthDataLayer} observations={earthObservations} zoomStage={zoomStage} homePoint={userLocation} activePoint={pickedPlace} arrivalBloom={arrivalBloom} pickingPlace={isPickingPlace} selectedId={selectedId} heldStoryIds={heldStoryIds} focus={focus} zoomCommand={zoomCommand} onSelect={selectStory} onSelectJourney={openCourierCargo} onPick={pickEarth} onZoom={handleEarthZoom} onNear={enterNeighborhood} onInteract={acknowledgeSpatialGuide} />
       <div className="ambient-memories" aria-hidden="true">
         {EXPERIENCE_MEMORIES.map((memory) => <span key={memory.id} className={`ambient-memory ${memory.className}`}><i /><i /><i /><i /><i /><b>{memory.year} · {locale === "zh" ? memory.zh : memory.en}</b></span>)}
       </div>
       <div className="place-foreground" aria-hidden="true"><i /><i /><i /><b /></div>
-      {mapVisible && <NeighborhoodMap point={isPickingPlace && pickedPlace ? pickedPlace : location} label={location.label} hierarchy={placeHierarchy} locale={locale} globeZoom={zoom} interactive={nearView} blend={mapBlend} zoomCommand={mapZoomCommand} stories={stories} activity={dailyActivity} journeys={journeys} activeJourneyId={activeJourneyId} onZoomChange={setMapZoom} onExitZoom={exitNeighborhoodByZoom} onPick={pickEarth} onSelectStory={selectStory} onIlluminate={(center) => { const point = coarsePublicPoint(center); setPickedPlace(point); setLocation((current) => ({ ...point, label: current.label })); openPinnedCompose(); }} />}
+      {mapVisible && <NeighborhoodMap point={isPickingPlace && pickedPlace ? pickedPlace : location} label={location.label} hierarchy={placeHierarchy} locale={locale} globeZoom={zoom} interactive={nearView} blend={mapBlend} zoomCommand={mapZoomCommand} stories={stories} activity={dailyActivity} journeys={journeys} activeJourneyId={activeJourneyId} onZoomChange={setMapZoom} onExitZoom={exitNeighborhoodByZoom} onPick={pickEarth} onSelectStory={selectStory} onSelectJourney={openCourierCargo} onCenterChange={syncSceneToMapCenter} onIlluminate={(center) => { const point = coarsePublicPoint(center); setPickedPlace(point); setLocation((current) => ({ ...point, label: current.label })); openPinnedCompose(); }} />}
       {mapVisible && <div className="map-place-frame" aria-hidden="true"><i /><i /><i /></div>}
 
       {!nearView && ["CONTINENT", "COUNTRY", "REGION"].includes(zoomStage) && !journeyView && !watchingStory && <div className={`geo-lens geo-lens-${zoomStage.toLowerCase()}`} role="status" aria-label={locale === "zh" ? `当前空间层级：${continentName}，${countryName}` : `Current spatial level: ${continentName}, ${countryName}`}>
@@ -5441,6 +5683,12 @@ export default function Home() {
         </div>
         {nearView && <button type="button" className="return-earth" onClick={returnToEarth}><i>◎</i><span><small>{locale === "zh" ? "随时退出" : "ALWAYS AVAILABLE"}</small><strong>{locale === "zh" ? "回到地球" : "Return to Earth"}</strong></span></button>}
       </aside>}
+
+      {!journeyView && !watchingStory && onboardingStage === "done" && <CourierLegend stage={zoomStage} locale={locale} activeModes={journeys.filter((journey) => journeyProgress(journey) < 1 || journey.id.startsWith("journey-demo-world-")).map((journey) => journey.mode)} open={courierLegendOpen} onToggle={() => setCourierLegendOpen((value) => !value)} onPickMode={openCourierCargoByMode} />}
+
+      {stageHint && !journeyView && !watchingStory && <div key={stageHint.nonce} className="stage-hint" role="status"><i aria-hidden="true">◈</i><span>{stageHint.text}</span></div>}
+
+      {cargoJourney && !journeyView && <JourneyCargoCard journey={cargoJourney} story={cargoStory} locale={locale} onFollow={() => { setCargoJourneyId(null); openJourney(cargoJourney, true); }} onRead={cargoStory ? () => { setCargoJourneyId(null); selectStory(cargoStory); } : null} onClose={() => setCargoJourneyId(null)} />}
 
       <header className="world-header">
         <div className="kc-brand" aria-label="KindChain">
