@@ -231,7 +231,11 @@ test("satellite descent adds real surface detail without replacing Earth or its 
   assert.match(source, /setSurfaceState\("standard"\)/);
   assert.match(source, /revealMap\(\);[\s\S]+setSurfaceState\("standard"\);[\s\S]+}, 900\)/);
   assert.match(source, /const mapBlend = nearView \? 1 : 0/);
-  assert.match(source, /const mapVisible = nearView \|\| zoom >= MAP_MOUNT_DEPTH/);
+  // v47: desktops still pre-mount the map during approach; compact devices
+  // mount it only on actual descent (a second live GL context while browsing
+  // the globe is what crashed mobile tabs).
+  assert.match(source, /const mapVisible = nearView \|\| \(zoom >= MAP_MOUNT_DEPTH && !compactDevice\)/);
+  assert.match(source, /function isCompactDevice\(\)/);
   assert.match(source, /className = "coarse-arrival-marker"/);
   assert.match(styles, /\.geo-place-label\.is-visible/);
   assert.match(styles, /\.map-curvature/);
