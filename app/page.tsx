@@ -503,6 +503,17 @@ const LOCAL_MAP_STYLE: import("maplibre-gl").StyleSpecification = {
 // previous .90/.985 handoff left a huge dark globe on screen and required one
 // extra zoom action before anything local appeared.
 const MAP_MOUNT_DEPTH = .74;
+
+// v47: phones get a lighter graphics diet. Mobile browsers enforce hard
+// per-tab memory ceilings (iOS Safari kills and reloads the page beyond
+// roughly a gigabyte) — three simultaneous GL contexts at 3× pixel ratio
+// with desktop-sized textures is exactly how a "stable" page becomes a
+// crash-reload loop on a phone.
+function isCompactDevice() {
+  if (typeof window === "undefined") return false;
+  const coarse = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+  return window.innerWidth <= 860 || (coarse && window.innerWidth <= 1180);
+}
 const MAP_HANDOFF_DEPTH = .92;
 const LOCAL_HANDOFF_ZOOM = .92;
 const ONBOARDING_STORY_ID = "ke-1";
@@ -1755,8 +1766,11 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
     const restoredView = viewStateRef.current.initialized;
     camera.position.set(0, 0, restoredView ? viewStateRef.current.cameraZ : CAMERA_NEAR + (1 - INITIAL_EARTH_ZOOM) * (CAMERA_FAR - CAMERA_NEAR));
     let renderer: import("three").WebGLRenderer;
+    const compactDevice = isCompactDevice();
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+      // Compact devices: no MSAA and no discrete-GPU hint — the visual
+      // difference at 3× DPR is negligible, the memory difference is not.
+      renderer = new THREE.WebGLRenderer({ antialias: !compactDevice, alpha: true, powerPreference: compactDevice ? "default" : "high-performance" });
     } catch {
       host.classList.add("no-webgl");
       setRenderMode("fallback");
@@ -1877,9 +1891,9 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
       };
       return;
     }
-    const compactRenderer = window.innerWidth <= 760 || window.devicePixelRatio > 2.5;
+    const compactRenderer = compactDevice || window.innerWidth <= 760 || window.devicePixelRatio > 2.5;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, compactRenderer ? 1.28 : 1.65));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, compactRenderer ? 1.15 : 1.65));
     renderer.setSize(host.clientWidth, host.clientHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -3345,7 +3359,10 @@ function NeighborhoodMap({ point, label, hierarchy, locale, globeZoom, interacti
           maxZoom: MAP_MAX_ZOOM,
           maxPitch: 45,
           attributionControl: true,
-          antialias: true,
+          antialias: !isCompactDevice(),
+          // MapLibre defaults to the full devicePixelRatio (3× on modern
+          // phones — a 9× framebuffer memory bill). Cap it.
+          pixelRatio: Math.min(typeof window === "undefined" ? 1 : window.devicePixelRatio, isCompactDevice() ? 1.6 : 2),
         });
         mapRef.current = map;
         // The descent container is born mid-transition (it can measure a
@@ -3867,8 +3884,9 @@ function CourierHero3D({ mode, variant = 0 }: { mode: CourierMode; variant?: num
         camera.updateProjectionMatrix();
       };
       frameCamera();
-      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true, powerPreference: "high-performance" });
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, host.clientWidth < 620 ? 1.25 : 1.7));
+      const compactHero = isCompactDevice();
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: !compactHero, powerPreference: compactHero ? "default" : "high-performance" });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, compactHero || host.clientWidth < 620 ? 1.15 : 1.7));
       renderer.setSize(host.clientWidth, host.clientHeight);
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -4361,6 +4379,7 @@ export default function Home() {
   const [pickedPlace, setPickedPlace] = useState<{ lat: number; lon: number } | null>(null);
   const [placePickerOpen, setPlacePickerOpen] = useState(false);
   const [journeys, setJourneys] = useState<Journey[]>(() => createExperienceJourneys());
+  const [compactDevice] = useState(() => isCompactDevice());
   const [activeJourneyId, setActiveJourneyId] = useState<string | null>("journey-demo-world-rocket");
   const [cargoJourneyId, setCargoJourneyId] = useState<string | null>(null);
   const [courierLegendOpen, setCourierLegendOpen] = useState(false);
@@ -4729,9 +4748,18 @@ export default function Home() {
     date.setUTCDate(date.getUTCDate() - 1);
     return date.toISOString().slice(0, 10);
   }, []);
-  const baseTextureUrl = "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=BlueMarble_ShadedRelief_Bathymetry&STYLES=&FORMAT=image/jpeg&TRANSPARENT=FALSE&HEIGHT=768&WIDTH=1536&CRS=EPSG:4326&BBOX=-90,-180,90,180";
-  const dailyTextureUrl = useMemo(() => `https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor&STYLES=&FORMAT=image/jpeg&TRANSPARENT=FALSE&HEIGHT=768&WIDTH=1536&CRS=EPSG:4326&BBOX=-90,-180,90,180&TIME=${nasaDate}`, [nasaDate]);
-  const nightTextureUrl = "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=VIIRS_CityLights_2012&STYLES=&FORMAT=image/jpeg&TRANSPARENT=FALSE&HEIGHT=768&WIDTH=1536&CRS=EPSG:4326&BBOX=-90,-180,90,180";
+  // v47: phones fetch half-size Earth textures — a quarter of the decode
+  // memory per layer, indistinguishable on a 6-inch screen. Swapped after
+  // hydration so server and client render the same initial markup.
+  const [textureSize, setTextureSize] = useState("HEIGHT=768&WIDTH=1536");
+  useEffect(() => {
+    if (!isCompactDevice()) return;
+    const timer = window.setTimeout(() => setTextureSize("HEIGHT=384&WIDTH=768"), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const baseTextureUrl = `https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=BlueMarble_ShadedRelief_Bathymetry&STYLES=&FORMAT=image/jpeg&TRANSPARENT=FALSE&${textureSize}&CRS=EPSG:4326&BBOX=-90,-180,90,180`;
+  const dailyTextureUrl = useMemo(() => `https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor&STYLES=&FORMAT=image/jpeg&TRANSPARENT=FALSE&${textureSize}&CRS=EPSG:4326&BBOX=-90,-180,90,180&TIME=${nasaDate}`, [nasaDate, textureSize]);
+  const nightTextureUrl = `https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=VIIRS_CityLights_2012&STYLES=&FORMAT=image/jpeg&TRANSPARENT=FALSE&${textureSize}&CRS=EPSG:4326&BBOX=-90,-180,90,180`;
   const textureUrl = earthLens === "daily" ? dailyTextureUrl : earthLens === "night" ? nightTextureUrl : baseTextureUrl;
 
   const fetchWeather = useCallback(async (lat: number, lon: number, label?: string) => {
@@ -5686,7 +5714,11 @@ export default function Home() {
   const mapBlend = nearView ? 1 : 0;
   const sceneReveal = Math.max(0, Math.min(1, (zoom - .5) / .32));
   const earthOpacity = Math.max(0, 1 - sceneReveal * .16 - mapBlend * .84);
-  const mapVisible = nearView || zoom >= MAP_MOUNT_DEPTH;
+  // v47: desktops pre-mount the real map during approach for a seamless
+  // handoff; phones cannot afford a second live GL context while browsing
+  // the globe (that is what crashed the tab), so they mount it only when
+  // the descent actually begins. The built-in atlas covers the first beat.
+  const mapVisible = nearView || (zoom >= MAP_MOUNT_DEPTH && !compactDevice);
   const localProgress = Math.max(0, Math.min(1, (mapZoom - MAP_ENTRY_ZOOM) / (MAP_MAX_ZOOM - MAP_ENTRY_ZOOM)));
   const depthProgress = nearView ? .78 + localProgress * .22 : Math.min(.78, zoom * .78);
   const zoomStage: ZoomStage = nearView
