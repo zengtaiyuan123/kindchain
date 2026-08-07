@@ -1456,3 +1456,69 @@ button.fallback-courier:hover i { color:#fff; }
 .courier-coach button:hover { background:rgba(255,255,255,.12);color:#fff; }
 .courier-coach>b { position:absolute;left:50%;bottom:-7px;translate:-50%;width:12px;height:12px;rotate:45deg;border-right:1px solid rgba(222,203,255,.34);border-bottom:1px solid rgba(222,203,255,.34);background:rgba(13,12,27,.96); }
 @media (prefers-reduced-motion: reduce) { .courier-coach { animation:none; } }
+
+/* ============================================================
+   v49 · arrival is a moment: ceremony + welcome-back, the first
+   thirty seconds tell one sentence, panels share one radius.
+   ============================================================ */
+
+/* --- arrival ceremony (① the missing closing of the loop) --- */
+.arrival-ceremony { position:fixed;z-index:80;left:50%;top:50%;translate:-50% -50%;width:min(400px,calc(100vw - 36px));padding:26px 24px 18px;display:flex;flex-direction:column;gap:13px;align-items:center;text-align:center;color:#f2ecfa;border:1px solid rgba(244,214,146,.3);border-radius:23px;background:linear-gradient(168deg,rgba(26,21,42,.96),rgba(10,10,24,.97));backdrop-filter:blur(30px) saturate(1.25);box-shadow:0 40px 110px rgba(0,0,0,.6),0 0 90px rgba(244,198,111,.14);animation:arrival-rise .65s cubic-bezier(.2,.9,.25,1); }
+@keyframes arrival-rise { from { opacity:0;translate:-50% -44%;scale:.94; } }
+.arrival-burst { position:absolute;top:-22px;left:50%;translate:-50%;width:44px;height:44px;pointer-events:none; }
+.arrival-burst b { position:absolute;inset:0;border:1px solid rgba(244,209,138,.55);border-radius:50%;animation:arrival-ring 2.6s ease-out infinite; }
+.arrival-burst b:nth-child(2) { animation-delay:.55s; }
+.arrival-burst b:nth-child(3) { animation-delay:1.1s; }
+@keyframes arrival-ring { from { scale:.3;opacity:1; } to { scale:2.4;opacity:0; } }
+.arrival-ceremony small { color:#d3b269;font:10px/1 var(--font-geist-mono),monospace;letter-spacing:2.2px; }
+.arrival-ceremony strong { color:#f7f2ea;font:400 21px/1.3 Georgia,serif; }
+.arrival-list { display:flex;flex-direction:column;gap:8px;width:100%; }
+.arrival-list span { display:grid;grid-template-columns:30px auto;grid-template-rows:auto auto;column-gap:10px;align-items:center;text-align:left;padding:8px 12px;border:1px solid rgba(255,255,255,.07);border-radius:13px;background:rgba(255,255,255,.03); }
+.arrival-list i { grid-row:1 / 3;width:28px;height:28px;display:grid;place-items:center;color:#efe3ff;border:1px solid rgba(222,203,255,.35);border-radius:50%;background:rgba(146,110,214,.2);font:normal 11px/1 Georgia,serif; }
+.arrival-list b { color:#e9e1f4;font:500 11px/1.2 var(--font-geist-sans),sans-serif; }
+.arrival-list em { color:#a99cc0;font:normal 10px/1.45 var(--font-geist-sans),sans-serif; }
+.arrival-ceremony blockquote { margin:0;color:#e7ddc9;font:italic 13px/1.6 Georgia,serif;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical; }
+.arrival-ceremony footer { display:flex;gap:9px;width:100%;margin-top:2px; }
+.arrival-ceremony footer button { flex:1;height:38px;cursor:pointer;border-radius:12px;font:500 12px/1 var(--font-geist-sans),sans-serif; }
+.arrival-view { color:#151021;border:0;background:linear-gradient(120deg,#ffe9b8,#f4c66f);box-shadow:0 12px 30px rgba(244,198,111,.28); }
+.arrival-view:hover { background:linear-gradient(120deg,#fff0cb,#f7d28a); }
+.arrival-done { color:#d9cfe8;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05); }
+.arrival-done:hover { background:rgba(255,255,255,.1); }
+.arrival-welcome { border-color:rgba(203,178,255,.26);box-shadow:0 40px 110px rgba(0,0,0,.6),0 0 90px rgba(158,124,236,.14); }
+.arrival-welcome small { color:#c0ace8; }
+
+/* --- first-minutes focus (③ one protagonist on first contact) --- */
+.is-intro-focus .courier-legend, .is-intro-focus .scale-control, .is-intro-focus .ambient-memories,
+.is-intro-focus .earth-truth-bar, .is-intro-focus .stage-hint, .is-intro-focus .geo-lens,
+.is-intro-focus .destination-moment, .is-intro-focus .map-content-readout { opacity:0 !important;pointer-events:none !important;transition:opacity .9s ease; }
+.courier-legend, .scale-control, .ambient-memories, .earth-truth-bar { transition:opacity .9s ease; }
+.intro-line { position:fixed;z-index:30;left:50%;bottom:132px;translate:-50%;display:flex;flex-direction:column;gap:7px;align-items:center;text-align:center;pointer-events:none;animation:intro-line-in 1.8s ease .4s both; }
+.intro-line span { color:#efe8dd;font:400 17px/1.5 Georgia,serif;text-shadow:0 2px 26px rgba(0,0,0,.6); }
+.intro-line em { color:#d3b269;font:italic 13px/1.4 Georgia,serif;animation:intro-line-breathe 3.2s ease-in-out 2s infinite; }
+@keyframes intro-line-in { from { opacity:0;translate:-50% 14px; } }
+@keyframes intro-line-breathe { 50% { opacity:.55; } }
+@media (max-width:720px) { .intro-line { bottom:118px;width:calc(100vw - 44px); } .intro-line span { font-size:15px; } .arrival-ceremony { padding:22px 18px 14px; } }
+
+/* --- ④ shared panel geometry: the newer surfaces adopt the house radius --- */
+.journey-cargo-card { border-radius:19px; }
+.courier-legend-panel { border-radius:19px; }
+.courier-coach { border-radius:14px; }
+@media (prefers-reduced-motion: reduce) { .arrival-burst b, .intro-line em { animation:none; } }
+
+/* ============================================================
+   v50 · the constellation becomes visible and weavable.
+   ============================================================ */
+.chain-row { display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;margin-top:10px;padding:9px 11px;border:1px solid color-mix(in srgb, var(--chain-color, #c9b2f2) 32%, transparent);border-radius:13px;background:color-mix(in srgb, var(--chain-color, #c9b2f2) 7%, transparent); }
+.chain-row>i { width:28px;height:28px;display:grid;place-items:center;color:var(--chain-color,#c9b2f2);border:1px solid color-mix(in srgb, var(--chain-color,#c9b2f2) 45%, transparent);border-radius:50%;font-size:12px;font-style:normal;text-shadow:0 0 12px var(--chain-color,#c9b2f2); }
+.chain-row span { min-width:0;display:flex;flex-direction:column;gap:3px; }
+.chain-row small { color:#8d829f;font:9px/1 var(--font-geist-mono),monospace;letter-spacing:.9px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis; }
+.chain-row strong { color:#e9e1f4;font:400 11.5px/1.35 var(--font-geist-sans),sans-serif; }
+.chain-relay { padding:8px 12px;color:#151021;cursor:pointer;border:0;border-radius:10px;background:linear-gradient(120deg,#e7d9ff,#b99cf2);font:500 10.5px/1 var(--font-geist-sans),sans-serif;white-space:nowrap;transition:translate .25s,box-shadow .25s; }
+.chain-relay:hover { translate:0 -1px;box-shadow:0 10px 24px rgba(158,124,236,.3); }
+.relay-chip { display:grid;grid-template-columns:28px minmax(0,1fr) 24px;gap:10px;align-items:center;margin:8px 0 2px;padding:9px 11px;border:1px solid rgba(203,178,255,.3);border-radius:13px;background:rgba(146,110,214,.1); }
+.relay-chip>i { color:#cbb2f2;font-style:normal;text-align:center;text-shadow:0 0 12px rgba(203,178,255,.8); }
+.relay-chip span { min-width:0;display:flex;flex-direction:column;gap:2px; }
+.relay-chip small { color:#9d90b5;font:8.5px/1 var(--font-geist-mono),monospace;letter-spacing:1px; }
+.relay-chip strong { color:#efe8fa;font:400 12px/1.2 Georgia,serif; }
+.relay-chip em { color:#a99cc0;font:normal 9.5px/1.4 var(--font-geist-sans),sans-serif; }
+.relay-chip button { width:22px;height:22px;display:grid;place-items:center;color:#b9aecb;cursor:pointer;border:1px solid rgba(255,255,255,.12);border-radius:50%;background:rgba(255,255,255,.05);font-size:12px; }

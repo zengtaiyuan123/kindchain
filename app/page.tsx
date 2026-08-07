@@ -741,10 +741,10 @@ const TRANSPORT_ORDER = Object.keys(TRANSPORTS) as CourierMode[];
 
 const COURIER_COACH_KEY = "kindchain-courier-coach-done";
 
-// v46: the KindChain courier fleet is self-hosted — our own Blender-built
-// models (purple/gold/pearl family, heart badges, named animation clips)
-// served from /public/models. Only the future-era Kindship still borrows a
-// third-party model until its own design lands.
+// v46-v49: the entire KindChain courier fleet is self-hosted — our own
+// Blender-built models (purple/gold/pearl family, heart badges, named
+// animation clips). As of v49 the Kindship starship is also original:
+// no third-party model remains anywhere in the product.
 const COURIER_ASSETS: Partial<Record<CourierMode, string[]>> = {
   hand: ["/KC_WALKING_MAIL_CARRIER_LOD0.glb"],
   pigeon: ["/KC_DOVE_LOD0.glb"],
@@ -752,7 +752,7 @@ const COURIER_ASSETS: Partial<Record<CourierMode, string[]>> = {
   rail: ["/KC_TRAIN_LOD0.glb"],
   plane: ["/KC_AIRPLANE_LOD0.glb"],
   rocket: ["/KC_ROCKET_LOD0.glb"],
-  starship: ["https://static.poly.pizza/0843ab59-1800-4d96-9cc7-b4d6afbecf21.glb"],
+  starship: ["/KC_STARSHIP_LOD0.glb"],
 };
 
 // Which named clips (from our GLBs) should loop while a courier travels.
@@ -763,6 +763,7 @@ const COURIER_CLIPS: Partial<Record<CourierMode, string[]>> = {
   rail: ["Wheel_Loop", "Rod_Loop"],
   plane: ["Idle_Flight", "Engine_Loop"],
   rocket: ["Flame_Loop", "Idle_Hover"],
+  starship: ["Idle_Drift", "Ring_Spin"],
 };
 
 const INITIAL_STORIES: Story[] = [
@@ -806,6 +807,39 @@ const INITIAL_STORIES: Story[] = [
     id: "au-1", chain: "moon-thread", lat: -33.87, lon: 151.21, region: "Sydney", country: "Australia", lang: "en",
     text: "The sun is rising here. I can lend you a little morning until yours arrives.",
     translations: { zh: "我这里太阳正在升起。在你的清晨到来之前，我可以先借给你一点光。", es: "Aquí está amaneciendo. Puedo prestarte un poco de mañana hasta que llegue la tuya.", fr: "Le soleil se lève ici. Je peux te prêter un peu de matin jusqu'à ce que le tien arrive.", ja: "こちらでは朝日が昇っています。あなたの朝が来るまで、少しだけ光を貸します。" }, replies: [],
+  },
+  {
+    id: "eg-1", chain: "aurora", lat: 30.04, lon: 31.24, region: "Cairo", country: "Egypt", lang: "en",
+    text: "My grandmother says the Nile has carried worries away for five thousand years. Give it yours too.",
+    translations: { zh: "祖母说,尼罗河替人带走忧愁已经五千年了。把你的也交给它吧。", es: "Mi abuela dice que el Nilo lleva cinco mil años llevándose las penas. Dale también las tuyas.", fr: "Ma grand-mère dit que le Nil emporte les soucis depuis cinq mille ans. Confie-lui aussi les tiens.", ja: "祖母は言う、ナイルは五千年も人の憂いを運んできたと。あなたのも、託してごらん。" }, replies: [],
+  },
+  {
+    id: "in-1", chain: "ember", lat: 19.08, lon: 72.88, region: "Mumbai", country: "India", lang: "en",
+    text: "I shared my lunch with a stranger on the train today. We did not speak the same language. It did not matter.",
+    translations: { zh: "今天在火车上,我把午饭分给了一位陌生人。我们语言不通,但这完全不重要。", es: "Hoy compartí mi almuerzo con un desconocido en el tren. No hablábamos el mismo idioma. No importó.", fr: "Aujourd'hui, j'ai partagé mon déjeuner avec un inconnu dans le train. Nous ne parlions pas la même langue. Cela n'avait aucune importance.", ja: "今日、電車で見知らぬ人とお弁当を分け合った。言葉は通じなかった。でも、それは問題じゃなかった。" },
+    replies: [{ id: "r-in1", lang: "zh", text: "这就是世界本来该有的样子。", translations: { en: "This is how the world is supposed to work.", es: "Así debería funcionar el mundo." } }],
+  },
+  {
+    id: "pl-1", chain: "moon-thread", lat: 52.23, lon: 21.01, region: "Warszawa", country: "Poland", lang: "en",
+    text: "To whoever is awake at 3 a.m. like me: the night is long, but it has never once forgotten to end.",
+    translations: { zh: "致此刻和我一样在凌晨三点醒着的人:夜很长,但它从来没有忘记过要结束。", es: "A quien esté despierto a las 3 de la mañana como yo: la noche es larga, pero nunca ha olvidado terminar.", fr: "À celui qui, comme moi, veille à trois heures du matin : la nuit est longue, mais elle n'a jamais oublié de finir.", ja: "私と同じように午前三時に起きている誰かへ。夜は長い。でも夜は、明けることを一度も忘れたことがない。" },
+    replies: [{ id: "r-pl1", lang: "ja", text: "東京はもう朝です。あなたの朝も、すぐそこまで来ています。", translations: { en: "It is already morning in Tokyo. Yours is almost there.", zh: "东京已经是早晨了。你的早晨,也快到了。" } }],
+  },
+  {
+    id: "pe-1", chain: "ember", lat: -12.05, lon: -77.04, region: "Lima", country: "Peru", lang: "es",
+    text: "Hoy planté un árbol que nunca veré crecer. Se sintió como escribir una carta al futuro.",
+    translations: { en: "Today I planted a tree I will never see grow tall. It felt like writing a letter to the future.", zh: "今天我种下了一棵我不会看着长大的树。感觉就像给未来写了一封信。", fr: "Aujourd'hui, j'ai planté un arbre que je ne verrai jamais grandir. C'était comme écrire une lettre au futur.", ja: "今日、大きくなるのを見届けられない木を植えた。未来へ手紙を書いたような気持ちだった。" }, replies: [],
+  },
+  {
+    id: "vn-1", chain: "aurora", lat: 21.03, lon: 105.85, region: "Hà Nội", country: "Vietnam", lang: "en",
+    text: "The pho seller near my house gives free soup to anyone who looks like they are having a hard day. Nobody asked her to.",
+    translations: { zh: "我家附近卖河粉的阿姨,会给每个看起来很难过的人免费盛一碗汤。没有人要求她这样做。", es: "La señora del pho cerca de mi casa regala sopa a quien parece tener un mal día. Nadie se lo pidió.", fr: "La vendeuse de pho près de chez moi offre une soupe à quiconque semble passer une mauvaise journée. Personne ne le lui a demandé.", ja: "家の近くのフォー屋のおばさんは、つらそうな顔の人に無料でスープを出す。誰にも頼まれていないのに。" }, replies: [],
+  },
+  {
+    id: "nz-1", chain: "moon-thread", lat: -41.29, lon: 174.78, region: "Wellington", country: "New Zealand", lang: "en",
+    text: "I am often the first person on Earth to see the new day. I promise it looks gentle from here. It is on its way to you.",
+    translations: { zh: "我常常是地球上最早看到新一天的人。我保证,从这里看,它很温柔。它正在去你那里的路上。", es: "Suelo ser de las primeras personas en ver el nuevo día. Prometo que desde aquí se ve amable. Va de camino hacia ti.", fr: "Je suis souvent parmi les premiers sur Terre à voir le jour nouveau. Je promets qu'il a l'air doux d'ici. Il est en route vers toi.", ja: "私はよく、地球でいちばん早く新しい一日を見る。ここから見るその一日は、やさしい顔をしている。いま、あなたのほうへ向かっている。" },
+    replies: [{ id: "r-nz1", lang: "es", text: "Aquí todavía es de noche. Gracias por avisar que viene.", translations: { en: "It is still night here. Thank you for the warning that it is coming.", zh: "这里还是黑夜。谢谢你提前告诉我,天亮正在路上。" } }],
   },
   {
     id: "br-1", chain: "ember", lat: -23.55, lon: -46.63, region: "São Paulo", country: "Brazil", lang: "es",
@@ -1350,9 +1384,15 @@ function createExperienceJourneys(now = Date.now()): Journey[] {
     { mode: "plane", storyId: "au-1", from: { lat: -33.87, lon: 151.21, label: "Sydney" }, to: { lat: 35.68, lon: 139.69, label: "Tokyo" }, scenario: "terminator", duration: 72000, offset: .73 },
     { mode: "rocket", storyId: "br-1", from: { lat: -23.55, lon: -46.63, label: "São Paulo" }, to: { lat: 64.15, lon: -21.94, label: "Reykjavík" }, scenario: "resonance", duration: 84000, offset: .44 },
     { mode: "starship", storyId: "mx-1", from: { lat: 19.43, lon: -99.13, label: "Ciudad de México" }, to: { lat: 1.35, lon: 103.82, label: "Singapore" }, scenario: "memorial", duration: 112000, offset: .17 },
+    { mode: "pigeon", storyId: "eg-1", from: { lat: 30.04, lon: 31.24, label: "Cairo" }, to: { lat: 37.98, lon: 23.73, label: "Athens" }, scenario: "wish", duration: 82000, offset: .3 },
+    { mode: "hand", storyId: "vn-1", from: { lat: 21.03, lon: 105.85, label: "Hà Nội" }, to: { lat: 16.46, lon: 107.59, label: "Huế" }, scenario: "companionship", duration: 98000, offset: .57 },
+    { mode: "plane", storyId: "pe-1", from: { lat: -12.05, lon: -77.04, label: "Lima" }, to: { lat: 19.43, lon: -99.13, label: "Ciudad de México" }, scenario: "resonance", duration: 76000, offset: .12 },
+    { mode: "rail", storyId: "pl-1", from: { lat: 52.23, lon: 21.01, label: "Warszawa" }, to: { lat: 50.09, lon: 14.42, label: "Praha" }, scenario: "shelter", duration: 92000, offset: .82 },
+    { mode: "carriage", storyId: "in-1", from: { lat: 19.08, lon: 72.88, label: "Mumbai" }, to: { lat: 18.52, lon: 73.86, label: "Pune" }, scenario: "reply", duration: 104000, offset: .41 },
+    { mode: "rocket", storyId: "nz-1", from: { lat: -41.29, lon: 174.78, label: "Wellington" }, to: { lat: 64.15, lon: -21.94, label: "Reykjavík" }, scenario: "terminator", duration: 96000, offset: .66 },
   ];
-  return routes.map((route) => ({
-    id: `journey-demo-world-${route.mode}`,
+  return routes.map((route, routeIndex) => ({
+    id: `journey-demo-world-${route.mode}${routeIndex >= 7 ? `-${routeIndex}` : ""}`,
     storyId: route.storyId,
     mode: route.mode,
     from: route.from,
@@ -1640,6 +1680,7 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
   const [renderMode, setRenderMode] = useState<"loading" | "webgl" | "fallback">("loading");
   const [courierCoachVisible, setCourierCoachVisible] = useState(false);
   const coachRef = useRef<HTMLDivElement | null>(null);
+  const scheduleCourierAssetsRef = useRef<(() => void) | null>(null);
   const dismissCourierCoach = useCallback(() => {
     try { window.localStorage.setItem(COURIER_COACH_KEY, "1"); } catch { /* private mode */ }
     setCourierCoachVisible(false);
@@ -2553,6 +2594,7 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
         journeyLayer.add(model);
         journeyVisuals.push({ journey, curve, model, trail, mailRelay: needsMailRelay(journey.mode, journey.distance) });
       });
+      scheduleCourierAssetsRef.current?.();
     };
     updateJourneyVisuals(journeysRef.current);
 
@@ -2587,7 +2629,13 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
       coachElement.style.top = `${(-coachProjectVector.y * .5 + .5) * host.clientHeight}px`;
     };
 
-    const courierAssetTimer = window.setTimeout(() => {
+    // v48: every courier on the globe wears its real self-hosted model — the
+    // per-journey guard that only dressed the active journey dates from the
+    // third-party-CDN era. Assets are ~200 KB each, same-origin and cached,
+    // so newly created journeys get their model too (loader re-runs after
+    // every visual rebuild; already-dressed models are skipped).
+    let courierAssetsTimer: number | null = null;
+    const loadCourierAssets = () => {
       if (cancelled || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
       void import("three/examples/jsm/loaders/GLTFLoader.js").then(({ GLTFLoader }) => {
         if (cancelled) return;
@@ -2601,7 +2649,8 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
           root.scale.setScalar(1 / maxSize);
         };
         journeyVisuals.forEach(({ journey, model }) => {
-          if (journey.id.startsWith("journey-demo-world-") && journey.id !== activeJourneyRef.current) return;
+          if (model.userData.kcDressed) return;
+          model.userData.kcDressed = true;
           const urls = COURIER_ASSETS[journey.mode];
           if (!urls) return;
           void Promise.all(urls.map((url) => loader.loadAsync(url))).then((assets) => {
@@ -2637,7 +2686,13 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
           }).catch(() => { /* Procedural courier remains as the offline fallback. */ });
         });
       }).catch(() => { /* Procedural couriers remain available if the model loader cannot be fetched. */ });
-    }, 2200);
+    };
+    const scheduleCourierAssets = (delay: number) => {
+      if (courierAssetsTimer !== null) window.clearTimeout(courierAssetsTimer);
+      courierAssetsTimer = window.setTimeout(loadCourierAssets, delay);
+    };
+    scheduleCourierAssetsRef.current = () => scheduleCourierAssets(900);
+    scheduleCourierAssets(2200);
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -3034,7 +3089,8 @@ function LivingWorld({ locale, stories, activity, journeys, activeJourneyId, tex
       viewStateRef.current.focusLocked = focusLocked;
       viewStateRef.current.initialized = true;
       cancelAnimationFrame(frame);
-      window.clearTimeout(courierAssetTimer);
+      if (courierAssetsTimer !== null) window.clearTimeout(courierAssetsTimer);
+      scheduleCourierAssetsRef.current = null;
       window.clearTimeout(courierCoachDelay);
       if (courierCoachPoll !== null) window.clearTimeout(courierCoachPoll);
       window.removeEventListener("resize", resize);
@@ -4206,6 +4262,37 @@ function CourierLegend({ stage, locale, activeModes, open, onToggle, onPickMode 
   );
 }
 
+function ArrivalCeremonyCard({ moment, stories, locale, onView, onClose }: {
+  moment: { live: boolean; journeys: Journey[] };
+  stories: Story[];
+  locale: Locale;
+  onView: (story: Story) => void;
+  onClose: () => void;
+}) {
+  const zh = locale === "zh";
+  const first = moment.journeys[0];
+  const firstStory = stories.find((story) => story.id === first?.storyId) ?? null;
+  return (
+    <aside className={`arrival-ceremony ${moment.live ? "arrival-live" : "arrival-welcome"}`} role="dialog" aria-label={zh ? "抵达" : "Arrival"}>
+      <i className="arrival-burst" aria-hidden="true"><b /><b /><b /></i>
+      <small>{moment.live ? (zh ? "此刻抵达 · ARRIVAL" : "ARRIVING NOW") : (zh ? "欢迎回来 · WELCOME BACK" : "WELCOME BACK")}</small>
+      <strong>{moment.live
+        ? (zh ? `你的光抵达了 ${first?.to.label ?? ""}` : `Your light reached ${first?.to.label ?? ""}`)
+        : (zh ? "你不在的时候,光没有停下" : "While you were away, the light kept moving")}</strong>
+      <div className="arrival-list">
+        {moment.journeys.slice(0, 3).map((journey) => (
+          <span key={journey.id}><i>{TRANSPORTS[journey.mode].glyph}</i><b>{TRANSPORTS[journey.mode].names[locale]}</b><em>{zh ? `走完了 ${Math.round(journey.distance).toLocaleString()} 公里,把光送到了 ${journey.to.label}` : `carried it ${Math.round(journey.distance).toLocaleString()} km to ${journey.to.label}`}</em></span>
+        ))}
+      </div>
+      {firstStory && <blockquote>“{storyText(firstStory, locale, false)}”</blockquote>}
+      <footer>
+        {firstStory && <button type="button" className="arrival-view" onClick={() => onView(firstStory)}>{zh ? "看这束光" : "See this light"} →</button>}
+        <button type="button" className="arrival-done" onClick={onClose}>{zh ? "好" : "OK"}</button>
+      </footer>
+    </aside>
+  );
+}
+
 function useSoundscape(on: boolean, environment: Environment) {
   const contextRef = useRef<AudioContext | null>(null);
   const masterRef = useRef<GainNode | null>(null);
@@ -4285,7 +4372,7 @@ function useSoundscape(on: boolean, environment: Environment) {
       void ctx.close();
     };
   }, [environment, on]);
-  return useCallback((cue: "lamp" | "watch" | "reply" | "depart") => {
+  return useCallback((cue: "lamp" | "watch" | "reply" | "depart" | "arrive" | "tap") => {
     const ctx = contextRef.current;
     const master = masterRef.current;
     if (!on || !ctx || !master) return;
@@ -4295,6 +4382,8 @@ function useSoundscape(on: boolean, environment: Environment) {
       watch: [146.83, 220, 293.66],
       reply: [261.63, 329.63, 392, 523.25],
       depart: [174.61, 261.63, 349.23],
+      arrive: [261.63, 392, 523.25, 659.25],
+      tap: [523.25, 659.25],
     } as const;
     palettes[cue].forEach((frequency, index) => {
       const oscillator = ctx.createOscillator();
@@ -4302,13 +4391,13 @@ function useSoundscape(on: boolean, environment: Environment) {
       const panner = ctx.createStereoPanner();
       const delay = ctx.createDelay(.8);
       const echo = ctx.createGain();
-      const start = ctx.currentTime + index * (cue === "reply" ? .12 : .09);
-      const duration = cue === "watch" ? 1.75 : cue === "reply" ? 1.35 : cue === "depart" ? 1.15 : .9;
+      const start = ctx.currentTime + index * (cue === "reply" ? .12 : cue === "arrive" ? .14 : cue === "tap" ? .04 : .09);
+      const duration = cue === "watch" ? 1.75 : cue === "reply" ? 1.35 : cue === "depart" ? 1.15 : cue === "arrive" ? 1.6 : cue === "tap" ? .32 : .9;
       oscillator.type = cue === "depart" && index === 0 ? "triangle" : "sine";
       oscillator.frequency.setValueAtTime(frequency, start);
       oscillator.frequency.exponentialRampToValueAtTime(frequency * (cue === "depart" ? 1.035 : 1.008), start + duration);
       gain.gain.setValueAtTime(.0001, start);
-      gain.gain.exponentialRampToValueAtTime(cue === "reply" ? .095 : cue === "watch" ? .052 : .068, start + .11);
+      gain.gain.exponentialRampToValueAtTime(cue === "reply" ? .095 : cue === "watch" ? .052 : cue === "arrive" ? .1 : cue === "tap" ? .034 : .068, start + .11);
       gain.gain.exponentialRampToValueAtTime(.0001, start + duration);
       panner.pan.value = Math.max(-.45, Math.min(.45, (index - 1.25) * .23));
       delay.delayTime.value = cue === "watch" ? .31 : .22;
@@ -4323,6 +4412,29 @@ function useSoundscape(on: boolean, environment: Environment) {
 
 export default function Home() {
   const [locale, setLocale] = useState<Locale>("zh");
+  // v50: speak the visitor's language from the first paint — detect once,
+  // then remember every explicit choice.
+  useEffect(() => {
+    let saved: string | null = null;
+    try { saved = window.localStorage.getItem("kindchain-locale-v1"); } catch { /* private mode */ }
+    const preferred = (saved && ["zh", "en", "es", "fr", "ja"].includes(saved))
+      ? saved as Locale
+      : ((): Locale => {
+        const tag = (navigator.language || "zh").toLowerCase();
+        if (tag.startsWith("zh")) return "zh";
+        if (tag.startsWith("es")) return "es";
+        if (tag.startsWith("fr")) return "fr";
+        if (tag.startsWith("ja")) return "ja";
+        return "en";
+      })();
+    const timer = window.setTimeout(() => setLocale(preferred), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+  const localePersistReady = useRef(false);
+  useEffect(() => {
+    if (!localePersistReady.current) { localePersistReady.current = true; return; }
+    try { window.localStorage.setItem("kindchain-locale-v1", locale); } catch { /* private mode */ }
+  }, [locale]);
   const [panel, setPanel] = useState<Panel>(null);
   const [stories, setStories] = useState<Story[]>(INITIAL_STORIES);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -4380,6 +4492,13 @@ export default function Home() {
   const [placePickerOpen, setPlacePickerOpen] = useState(false);
   const [journeys, setJourneys] = useState<Journey[]>(() => createExperienceJourneys());
   const [compactDevice] = useState(() => isCompactDevice());
+  const [arrivalMoment, setArrivalMoment] = useState<{ live: boolean; journeys: Journey[] } | null>(null);
+  const [relayChain, setRelayChain] = useState<string | null>(null);
+  const sessionStartRef = useRef(0);
+  useEffect(() => {
+    if (sessionStartRef.current === 0) sessionStartRef.current = Date.now();
+  }, []);
+  const [introFocus, setIntroFocus] = useState(false);
   const [activeJourneyId, setActiveJourneyId] = useState<string | null>("journey-demo-world-rocket");
   const [cargoJourneyId, setCargoJourneyId] = useState<string | null>(null);
   const [courierLegendOpen, setCourierLegendOpen] = useState(false);
@@ -4739,9 +4858,21 @@ export default function Home() {
         createdAt: Date.now(),
       })));
       if (stampKeepsakes.length > 0) setKeepsakes((items) => [...items, ...stampKeepsakes.filter((record) => !items.some((item) => item.id === record.id))].slice(-48));
+      // v49 ①: arrival is a moment, not a silent bookkeeping entry. Arrivals
+      // that happened while the person was away become a welcome-back card;
+      // arrivals witnessed live become a ceremony with light and sound.
+      const sessionStart = sessionStartRef.current || Number.MAX_SAFE_INTEGER;
+      const liveArrivals = arrived.filter((journey) => journey.startedAt + journey.demoDurationMs >= sessionStart);
+      const awayArrivals = arrived.filter((journey) => journey.startedAt + journey.demoDurationMs < sessionStart);
+      if (liveArrivals.length > 0) {
+        setArrivalMoment({ live: true, journeys: liveArrivals });
+        playCue("arrive");
+      } else if (awayArrivals.length > 0) {
+        setArrivalMoment({ live: false, journeys: awayArrivals });
+      }
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [journeys, localStateReady, locale, messengerMemory.settledJourneyIds, now]);
+  }, [journeys, localStateReady, locale, messengerMemory.settledJourneyIds, now, playCue]);
 
   const nasaDate = useMemo(() => {
     const date = new Date();
@@ -5136,6 +5267,7 @@ export default function Home() {
   const openCompose = (mode: ComposeMode, scene: ComposeScene = null) => {
     setWatchingStoryId(null);
     setDepartureTicket(null);
+    setRelayChain(null);
     setComposeMode(mode);
     setComposeScene(scene);
     setComposeStep(1);
@@ -5144,6 +5276,14 @@ export default function Home() {
     setPlacePickerOpen(false);
     if (mode === "reply") setCourierMode("pigeon");
     setPanel("compose");
+  };
+
+  // v50: weaving a constellation is a first-class action — your new light
+  // becomes the next star of an existing chain (whitepaper §14: replies bind
+  // the parent; relays extend the constellation itself).
+  const openRelayCompose = (chain: string) => {
+    openCompose("light");
+    setRelayChain(chain);
   };
 
   const openPinnedCompose = () => {
@@ -5262,6 +5402,29 @@ export default function Home() {
     setPanel("compose");
   };
 
+  // v49 ③: the first thirty seconds tell one sentence. Secondary chrome
+  // (legend, gauges, data bars) fades out until the first touch, so the
+  // planet — and one invitation — is the only protagonist on screen.
+  useEffect(() => {
+    if (!arrivalMoment?.live) return;
+    const timer = window.setTimeout(() => setArrivalMoment(null), 14000);
+    return () => window.clearTimeout(timer);
+  }, [arrivalMoment]);
+
+  const endIntroFocus = useCallback(() => {
+    setIntroFocus(false);
+    try { window.localStorage.setItem("kindchain-intro-focus-v1", "1"); } catch { /* private mode */ }
+  }, []);
+  useEffect(() => {
+    try { if (window.localStorage.getItem("kindchain-intro-focus-v1")) return; } catch { return; }
+    const showTimer = window.setTimeout(() => setIntroFocus(true), 600);
+    const endTimer = window.setTimeout(() => {
+      setIntroFocus(false);
+      try { window.localStorage.setItem("kindchain-intro-focus-v1", "1"); } catch { /* private mode */ }
+    }, 27000);
+    return () => { window.clearTimeout(showTimer); window.clearTimeout(endTimer); };
+  }, []);
+
   const openJourney = (journey: Journey, cinematic = false) => {
     setActiveJourneyId(journey.id);
     setJourneyView(cinematic);
@@ -5277,7 +5440,8 @@ export default function Home() {
     setActiveJourneyId(journey.id);
     setCargoJourneyId(journey.id);
     setCourierLegendOpen(false);
-  }, []);
+    playCue("tap");
+  }, [playCue]);
 
   const openCourierCargoByMode = useCallback((mode: CourierMode) => {
     setJourneys((current) => {
@@ -5403,7 +5567,7 @@ export default function Home() {
     const targetPlaceLabel = targetProfile.title[locale === "zh" ? "zh" : "en"];
     const origin = userLocation ? activityOriginFor(userLocation, senderOrigin.label) : undefined;
     const newStory: Story = {
-      id: `local-${idSeed}`, chain: composeMode === "reply" && selected ? selected.chain : `path-${idSeed}`, lat: target.lat, lon: target.lon,
+      id: `local-${idSeed}`, chain: composeMode === "reply" && selected ? selected.chain : relayChain ?? `path-${idSeed}`, lat: target.lat, lon: target.lon,
       region: delivery === "nearby" ? (locale === "zh" ? "你的附近" : "Near you") : delivery === "place" ? targetPlaceLabel : (locale === "zh" ? "地球某处" : "Somewhere on Earth"),
       country: "Earth", lang: detectedLanguage, text, translations: {}, replies: [], kind: composeMode === "wish" ? "wish" : "light",
       createdAt, expiresAt: createdAt + (composeMode === "wish" ? 48 : 24) * 3600000,
@@ -5746,10 +5910,14 @@ export default function Home() {
   const isPickingPlace = placePickerOpen && panel === "compose" && composeStep === 3 && delivery === "place";
   const isMemorySky = (panel === "menu" && worldTab === "memories") || (panel === "archive" && archiveTab === "keepsakes") || (journeyView && activeJourney?.scenario === "memorial");
   const arrivalBloom = useMemo(() => {
+    if (arrivalMoment?.live && arrivalMoment.journeys[0]) {
+      const journey = arrivalMoment.journeys[0];
+      return { lat: journey.to.lat, lon: journey.to.lon, nonce: stableHash(`arrive-${journey.id}`) };
+    }
     if (replyCeremony && selected) return { lat: selected.lat, lon: selected.lon, nonce: stableHash(replyCeremony.id) };
     if (pickedPlace && placeMomentNonce > 0) return { lat: pickedPlace.lat, lon: pickedPlace.lon, nonce: placeMomentNonce };
     return null;
-  }, [pickedPlace, placeMomentNonce, replyCeremony, selected]);
+  }, [arrivalMoment, pickedPlace, placeMomentNonce, replyCeremony, selected]);
   // v44 ②: announce couriers the moment a zoom layer brings them on stage, so
   // "when do I see the pigeon / the plane?" is answered by the scene itself.
   const visibleCourierSignature = TRANSPORT_ORDER.filter((mode) => courierPresentationAtZoom(mode, zoomStage) !== "hidden").join("|");
@@ -5794,7 +5962,7 @@ export default function Home() {
   } : null;
 
   return (
-    <main className={`world-app time-${environment.time} weather-${environment.weather} biome-${environment.biome} hazard-${environment.hazard} zone-${currentZone} place-${placeProfile.id} season-${backgroundIdentity.season} latitude-${backgroundIdentity.latitude} air-${backgroundIdentity.air} wind-${backgroundIdentity.wind} settlement-${backgroundIdentity.settlement} material-${backgroundIdentity.material} zoom-${zoomStage.toLowerCase()} ${environment.aurora ? "aurora-active" : ""} ${zoom > .65 ? "is-near" : ""} ${nearView ? "near-map-open" : ""} ${panel === "menu" ? "is-world-open" : ""} ${panel === "light-choice" || panel === "support" || supportReceipt ? "is-support-open" : ""} ${journeyView ? `journey-view journey-${activeJourney?.mode ?? "pigeon"}` : ""} ${earthHidden ? "earth-hidden" : ""} ${isEncountering ? "is-encountering" : ""} ${isPickingPlace ? "is-picking-place" : ""} ${watchingStory ? "is-watching" : ""} ${isMemorySky ? "is-memory-sky" : ""} ${cargoJourney && !journeyView ? "is-cargo-open" : ""}`} style={{ "--earth-zoom": String(zoom), "--earth-opacity": String(earthOpacity), "--scene-reveal": String(sceneReveal), "--courier-scale": String(courierScale), "--solar-x": `${solarX}%`, "--map-blend": String(mapBlend), "--place-foreground": String(placeForegroundStrength), "--place-zenith": placeProfile.palette.zenith, "--place-horizon": placeProfile.palette.horizon, "--place-far": placeProfile.palette.far, "--place-near": placeProfile.palette.near, "--place-water": placeProfile.palette.water, "--place-glow": placeProfile.palette.glow } as CSSProperties}>
+    <main className={`world-app time-${environment.time} weather-${environment.weather} biome-${environment.biome} hazard-${environment.hazard} zone-${currentZone} place-${placeProfile.id} season-${backgroundIdentity.season} latitude-${backgroundIdentity.latitude} air-${backgroundIdentity.air} wind-${backgroundIdentity.wind} settlement-${backgroundIdentity.settlement} material-${backgroundIdentity.material} zoom-${zoomStage.toLowerCase()} ${environment.aurora ? "aurora-active" : ""} ${zoom > .65 ? "is-near" : ""} ${nearView ? "near-map-open" : ""} ${panel === "menu" ? "is-world-open" : ""} ${panel === "light-choice" || panel === "support" || supportReceipt ? "is-support-open" : ""} ${journeyView ? `journey-view journey-${activeJourney?.mode ?? "pigeon"}` : ""} ${earthHidden ? "earth-hidden" : ""} ${isEncountering ? "is-encountering" : ""} ${isPickingPlace ? "is-picking-place" : ""} ${watchingStory ? "is-watching" : ""} ${isMemorySky ? "is-memory-sky" : ""} ${cargoJourney && !journeyView ? "is-cargo-open" : ""} ${introFocus ? "is-intro-focus" : ""}`} style={{ "--earth-zoom": String(zoom), "--earth-opacity": String(earthOpacity), "--scene-reveal": String(sceneReveal), "--courier-scale": String(courierScale), "--solar-x": `${solarX}%`, "--map-blend": String(mapBlend), "--place-foreground": String(placeForegroundStrength), "--place-zenith": placeProfile.palette.zenith, "--place-horizon": placeProfile.palette.horizon, "--place-far": placeProfile.palette.far, "--place-near": placeProfile.palette.near, "--place-water": placeProfile.palette.water, "--place-glow": placeProfile.palette.glow } as CSSProperties} onPointerDownCapture={introFocus ? endIntroFocus : undefined}>
       <WeatherWall key={`${placeProfile.id}-${Math.round(location.lat * 2)}-${Math.round(location.lon * 2)}-${sceneNonce}`} environment={environment} weather={weather} identity={backgroundIdentity} profile={placeProfile} strength={placeWallStrength} point={location} sceneSeed={sceneNonce} />
       <div className="emotional-atmosphere" aria-hidden="true"><i /><i /><i /><b /></div>
       <div className="memory-sky" aria-hidden="true"><i /><i /><i /><i /><i /><i /><b /><em /></div>
@@ -5834,6 +6002,10 @@ export default function Home() {
       {!journeyView && !watchingStory && onboardingStage === "done" && <CourierLegend stage={zoomStage} locale={locale} activeModes={journeys.filter((journey) => journeyProgress(journey) < 1 || journey.id.startsWith("journey-demo-world-")).map((journey) => journey.mode)} open={courierLegendOpen} onToggle={() => setCourierLegendOpen((value) => !value)} onPickMode={openCourierCargoByMode} />}
 
       {stageHint && !journeyView && !watchingStory && !notice && !isPickingPlace && !replyCeremony && !supportReceipt && <div key={stageHint.nonce} className="stage-hint" role="status"><i aria-hidden="true">◈</i><span>{stageHint.text}</span></div>}
+
+      {introFocus && <div className="intro-line" aria-hidden="true"><span>{locale === "zh" ? "这是一颗人们互相托付善意的星球" : "A planet where people entrust kindness to each other"}</span><em>{locale === "zh" ? "你也留下一束吧" : "Leave a light of your own"}</em></div>}
+
+      {arrivalMoment && !journeyView && <ArrivalCeremonyCard moment={arrivalMoment} stories={stories} locale={locale} onView={(story) => { setArrivalMoment(null); selectStory(story); }} onClose={() => setArrivalMoment(null)} />}
 
       {cargoJourney && !journeyView && <JourneyCargoCard journey={cargoJourney} story={cargoStory} locale={locale} onFollow={() => { setCargoJourneyId(null); openJourney(cargoJourney, true); }} onRead={cargoStory ? () => { setCargoJourneyId(null); selectStory(cargoStory); } : null} onClose={() => setCargoJourneyId(null)} />}
 
@@ -5881,6 +6053,24 @@ export default function Home() {
           {selected.kind === "support" && <div className="support-story-context"><div className="support-breath" aria-hidden="true"><i /><i /><b>⌁</b></div><span><small>{selected.supportLevel === "urgent" ? support.urgentTitle : support.listenTitle}</small><strong>{support[selected.supportNeed ?? "heard"]}</strong><em>{selected.localOnly ? support.localOnly : support.privacy}</em></span></div>}
           <div className={`story-lamp ${heldStoryIds.includes(selected.id) ? "lit" : ""}`} aria-hidden="true"><i /><b /></div>
           <blockquote>“{storyText(selected, locale, showOriginal)}”</blockquote>
+          {selected.kind !== "support" && (() => {
+            const chainMates = stories.filter((story) => story.chain === selected.chain);
+            const chainIndex = chainMates.findIndex((story) => story.id === selected.id);
+            const chainRegions = new Set(chainMates.map((story) => story.region)).size;
+            const zh = locale === "zh";
+            return (
+              <div className="chain-row" style={{ "--chain-color": `#${chainColor(selected.chain).toString(16).padStart(6, "0")}` } as CSSProperties}>
+                <i aria-hidden="true">✶</i>
+                <span>
+                  <small>{zh ? "星链" : "STAR CHAIN"} · {constellationName(selected.chain, locale)}</small>
+                  <strong>{chainMates.length > 1
+                    ? (zh ? `第 ${chainIndex + 1} / ${chainMates.length} 颗星 · 跨 ${chainRegions} 片天空` : `Star ${chainIndex + 1} of ${chainMates.length} · across ${chainRegions} skies`)
+                    : (zh ? "这条星链刚刚诞生 · 接力让它成形" : "A newborn chain — a relay gives it shape")}</strong>
+                </span>
+                <button type="button" className="chain-relay" onClick={() => openRelayCompose(selected.chain)}>{zh ? "延续这条星链" : "Extend this chain"} ✶</button>
+              </div>
+            );
+          })()}
           <div className="translation-switch">
             <button className={showOriginal ? "active" : ""} onClick={() => setShowOriginal(true)}>{c.original}</button>
             <button className={!showOriginal ? "active" : ""} onClick={() => setShowOriginal(false)}>✦ {c.translate}</button>
@@ -6235,6 +6425,7 @@ export default function Home() {
           </div>
           {composeScene && <div className={`compose-scene scene-${composeScene}`}><i>✦</i><span><small>{locale === "zh" ? "共同瞬间镜头" : "SHARED MOMENT SCENE"}</small><strong>{pulse.compose[composeScene]}</strong></span></div>}
           {composeMode === "reply" && selected && <blockquote>“{storyText(selected, locale, false)}”</blockquote>}
+          {relayChain && composeMode !== "reply" && <div className="relay-chip"><i aria-hidden="true">✶</i><span><small>{locale === "zh" ? "接力星链" : "RELAYING CHAIN"}</small><strong>{constellationName(relayChain, locale)}</strong><em>{locale === "zh" ? "你的光将成为这条星链的下一颗星" : "Your light becomes this chain's next star"}</em></span><button type="button" onClick={() => setRelayChain(null)} aria-label={locale === "zh" ? "取消接力" : "Cancel relay"}>×</button></div>}
           {composeMode === "reply" && selected?.kind === "support" && <div className="support-reply-guidance"><i aria-hidden="true">◇</i><span>{support.companionRules}</span></div>}
           <form onSubmit={submitStory}>
             {composeStep === 1 && <div className="compose-step compose-write-step">
