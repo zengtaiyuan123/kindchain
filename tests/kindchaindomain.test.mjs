@@ -60,7 +60,9 @@ test("couriers appear only in spatially coherent camera layers", () => {
   assert.equal(courierPresentationAtZoom("rocket", "COMMUNITY"), "hidden");
   assert.equal(courierPresentationAtZoom("hand", "ORBIT"), "hidden");
   assert.equal(courierPresentationAtZoom("hand", "COMMUNITY"), "model");
-  assert.equal(courierPresentationAtZoom("plane", "COUNTRY"), "trace");
+  assert.equal(courierPresentationAtZoom("plane", "COUNTRY"), "model");
+  assert.equal(courierPresentationAtZoom("starship", "EARTH"), "model");
+  assert.equal(courierPresentationAtZoom("plane", "REGION"), "trace");
 });
 
 test("globe zoom settles onto the nearest narrative layer", () => {
